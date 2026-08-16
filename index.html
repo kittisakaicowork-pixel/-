@@ -832,7 +832,8 @@ function drawWheel(list){
   $("#spinBtn").disabled = false; $("#wheelCenterBtn").disabled = false;
   const n = list.length;
   const slice = (Math.PI*2)/n;
-  // Restaurant name always renders (no emoji — it's what actually identifies the slice).
+  // Restaurant name always renders (with its cuisine-type emoji) — the name is what
+  // actually identifies the slice, so it never gets dropped in favor of the emoji alone.
   // Font shrinks and the text budget is computed from real glyph widths as slices get
   // thinner, so it degrades to a short-but-real fragment instead of disappearing.
   const fontSize = n<=8 ? 13 : n<=12 ? 12 : n<=20 ? 10.5 : n<=32 ? 9 : 8;
@@ -863,7 +864,7 @@ function drawWheel(list){
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     ctx.font = "bold "+fontSize+"px -apple-system,sans-serif";
-    const label = fitTextToWidth(list[i].name, textBudget);
+    const label = fitTextToWidth(TYPE_EMOJI[list[i].type]+" "+list[i].name, textBudget);
     ctx.fillText(label, textRadius, 0);
     ctx.restore();
   }
