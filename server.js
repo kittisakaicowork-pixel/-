@@ -239,6 +239,7 @@ function mapUserPublic(row) {
     username: row.username, role: row.role, name: row.name,
     firstName: row.first_name || "", lastName: row.last_name || "",
     phone: row.phone || "", email: row.email || "", age: row.age || "",
+    birthdate: row.birthdate || null,
     registeredAt: row.registered_at
   };
 }

@@ -419,7 +419,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
       <div class="hint" id="customerCount" style="margin-bottom:10px;">ทั้งหมด 0 คน</div>
       <div class="table-scroll">
         <table class="admin-table">
-          <thead><tr><th>ชื่อ-นามสกุล</th><th>Username</th><th>เบอร์โทร</th><th>อีเมล</th><th>อายุ</th><th>สิทธิ์</th><th>โปรด</th><th>สุ่มแล้ว</th><th></th></tr></thead>
+          <thead><tr><th>ชื่อ-นามสกุล</th><th>Username</th><th>เบอร์โทร</th><th>อีเมล</th><th>อายุ</th><th>วันเกิด</th><th>สิทธิ์</th><th>โปรด</th><th>สุ่มแล้ว</th><th></th></tr></thead>
           <tbody id="customerTableBody"></tbody>
         </table>
       </div>
@@ -1311,7 +1311,7 @@ function buildActivityHtml(u, data){
   const hist = (data.spinHistory||[]).slice(0,30);
   const visits = (data.visitLog||[]).slice(0,20);
   const respins = (data.respinLog||[]).slice(0,20);
-  const contactBits = [u.phone,u.email,u.age?u.age+" ปี":""].filter(Boolean).join(" · ");
+  const contactBits = [u.phone,u.email,u.age?u.age+" ปี":"",u.birthdate?"เกิด "+String(u.birthdate).slice(0,10):""].filter(Boolean).join(" · ");
   return (
     '<div class="profile-head">'+
       '<div class="profile-avatar">'+(u.name?u.name.charAt(0):"?")+'</div>'+
@@ -1653,24 +1653,25 @@ $all("#adminInnerTabs .nav-tab").forEach(t=>{
 /* ================= ADMIN: CUSTOMERS ================= */
 async function renderCustomerTable(){
   const tbody = $("#customerTableBody");
-  tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">กำลังโหลด...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-soft);">กำลังโหลด...</td></tr>';
   let users;
   try{
     users = await apiFetch("/api/users",{headers:authHeaders()});
   }catch(err){
-    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-soft);">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</td></tr>';
     $("#customerCount").textContent = "ทั้งหมด 0 คน";
     return;
   }
   $("#customerCount").textContent = "ทั้งหมด "+users.length+" คน";
   tbody.innerHTML = "";
   if(!users.length){
-    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">ยังไม่มีลูกค้าสมัครสมาชิก</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-soft);">ยังไม่มีลูกค้าสมัครสมาชิก</td></tr>';
     return;
   }
   users.forEach(u=>{
     const tr = el("tr");
     tr.innerHTML = '<td>'+(u.name||"-")+'</td><td>'+u.username+'</td><td>'+(u.phone||"-")+'</td><td>'+(u.email||"-")+'</td><td>'+(u.age||"-")+'</td>'+
+      '<td>'+(u.birthdate?String(u.birthdate).slice(0,10):"-")+'</td>'+
       '<td>'+(u.role==="admin"?'<span class="badge-role">ADMIN</span>':'สมาชิก')+'</td>'+
       '<td>'+u.favCount+'</td><td>'+u.spinCount+'</td>'+
       '<td><button class="mini-btn edit" data-cust="'+u.username+'">ดูรายละเอียด</button></td>';
