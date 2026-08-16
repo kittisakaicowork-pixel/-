@@ -832,13 +832,12 @@ function drawWheel(list){
   $("#spinBtn").disabled = false; $("#wheelCenterBtn").disabled = false;
   const n = list.length;
   const slice = (Math.PI*2)/n;
-  const rawFontSize = n<=8 ? 13 : n<=12 ? 12 : 11;
-  const textBudget = Math.max(4, slice * (radius*0.72) * 0.9);
-  // Once the per-slice width can't fit more than a couple of characters after the emoji,
-  // a truncated fragment isn't actually readable — switch to a bigger centered emoji instead.
-  const emojiOnly = textBudget < 58;
-  const fontSize = emojiOnly ? Math.min(16, Math.max(11, radius*0.09)) : rawFontSize;
-  const textRadius = radius - (emojiOnly ? radius*0.32 : 12);
+  // Restaurant name always renders (no emoji — it's what actually identifies the slice).
+  // Font shrinks and the text budget is computed from real glyph widths as slices get
+  // thinner, so it degrades to a short-but-real fragment instead of disappearing.
+  const fontSize = n<=8 ? 13 : n<=12 ? 12 : n<=20 ? 10.5 : n<=32 ? 9 : 8;
+  const textRadius = radius - 10;
+  const textBudget = Math.max(8, slice * (radius*0.82) * 0.92);
 
   for(let i=0;i<n;i++){
     const start = -Math.PI/2 + i*slice;
@@ -856,22 +855,16 @@ function drawWheel(list){
     ctx.save();
     ctx.translate(R,R);
     ctx.rotate(start + slice/2);
+    ctx.textAlign = "right";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.shadowColor = "rgba(0,0,0,.4)";
+    ctx.shadowColor = "rgba(0,0,0,.45)";
     ctx.shadowBlur = 3;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
-    if(emojiOnly){
-      ctx.textAlign = "center";
-      ctx.font = fontSize+"px -apple-system,sans-serif";
-      ctx.fillText(TYPE_EMOJI[list[i].type], textRadius, 0);
-    } else {
-      ctx.textAlign = "right";
-      ctx.font = "bold "+fontSize+"px -apple-system,sans-serif";
-      const label = fitTextToWidth(TYPE_EMOJI[list[i].type]+" "+list[i].name, textBudget);
-      ctx.fillText(label, textRadius, 0);
-    }
+    ctx.font = "bold "+fontSize+"px -apple-system,sans-serif";
+    const label = fitTextToWidth(list[i].name, textBudget);
+    ctx.fillText(label, textRadius, 0);
     ctx.restore();
   }
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
