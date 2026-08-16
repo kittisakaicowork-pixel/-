@@ -131,29 +131,39 @@ async function initDb() {
     );
   `);
 
-  const { rows: rcount } = await pool.query("SELECT COUNT(*) FROM restaurants");
-  if (parseInt(rcount[0].count, 10) === 0) {
-    for (const r of SEED_RESTAURANTS) {
-      await pool.query(
-        `INSERT INTO restaurants (id,name,type,floor,zone,price,rating,recommended,hours,tags,contact,delivery,pax,is_new)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-        [r.id, r.name, r.type, r.floor, r.zone, r.price, r.rating, JSON.stringify(r.recommended), r.hours, JSON.stringify(r.tags), r.contact, JSON.stringify(r.delivery), JSON.stringify(r.pax), r.isNew]
-      );
-    }
-    await pool.query("SELECT setval(pg_get_serial_sequence('restaurants','id'), (SELECT MAX(id) FROM restaurants))");
-  }
+  await seedRestaurants();
+  await seedUsers();
+}
 
-  const { rows: ucount } = await pool.query("SELECT COUNT(*) FROM users");
-  if (parseInt(ucount[0].count, 10) === 0) {
-    const adminHash = await bcrypt.hash("admin", 10);
-    const userHash = await bcrypt.hash("user", 10);
+// Idempotent — safe to call on every boot or on demand. Uses ON CONFLICT DO NOTHING
+// so it only ever backfills missing rows, never touches existing/edited data.
+async function seedRestaurants() {
+  for (const r of SEED_RESTAURANTS) {
     await pool.query(
-      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age)
-       VALUES ('admin',$1,'admin','Admin',NULL,NULL,NULL,NULL,NULL),
-              ('user',$2,'user','คุณผู้ใช้','คุณ','ผู้ใช้','081-000-0000','user@example.com','25')`,
-      [adminHash, userHash]
+      `INSERT INTO restaurants (id,name,type,floor,zone,price,rating,recommended,hours,tags,contact,delivery,pax,is_new)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       ON CONFLICT (id) DO NOTHING`,
+      [r.id, r.name, r.type, r.floor, r.zone, r.price, r.rating, JSON.stringify(r.recommended), r.hours, JSON.stringify(r.tags), r.contact, JSON.stringify(r.delivery), JSON.stringify(r.pax), r.isNew]
     );
   }
+  await pool.query("SELECT setval(pg_get_serial_sequence('restaurants','id'), GREATEST((SELECT COALESCE(MAX(id),0) FROM restaurants), 1))");
+}
+
+async function seedUsers() {
+  const adminHash = await bcrypt.hash("admin", 10);
+  const userHash = await bcrypt.hash("user", 10);
+  await pool.query(
+    `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age)
+     VALUES ('admin',$1,'admin','Admin',NULL,NULL,NULL,NULL,NULL)
+     ON CONFLICT (username) DO NOTHING`,
+    [adminHash]
+  );
+  await pool.query(
+    `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age)
+     VALUES ('user',$1,'user','คุณผู้ใช้','คุณ','ผู้ใช้','081-000-0000','user@example.com','25')
+     ON CONFLICT (username) DO NOTHING`,
+    [userHash]
+  );
 }
 
 function mapRestaurant(row) {
@@ -218,6 +228,17 @@ app.delete("/api/restaurants/:id", async (req, res) => {
     await pool.query("DELETE FROM restaurants WHERE id=$1", [req.params.id]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: "ลบร้านไม่สำเร็จ" }); }
+});
+
+// Backfills the 49 seed restaurants + admin/user mock accounts if missing.
+// Safe to call anytime — only inserts rows that don't already exist.
+app.post("/api/admin/reseed", async (req, res) => {
+  try {
+    await seedRestaurants();
+    await seedUsers();
+    const { rows } = await pool.query("SELECT COUNT(*) FROM restaurants");
+    res.json({ ok: true, restaurantCount: parseInt(rows[0].count, 10) });
+  } catch (e) { console.error(e); res.status(500).json({ error: "เติมข้อมูลไม่สำเร็จ: " + e.message }); }
 });
 
 /* ================= AUTH ================= */

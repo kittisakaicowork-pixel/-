@@ -401,7 +401,8 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     </div>
 
     <div id="adminDataPanel">
-      <button class="btn btn-primary btn-block" id="addRestaurantBtn" style="margin-bottom:14px;">➕ เพิ่มร้านใหม่</button>
+      <button class="btn btn-primary btn-block" id="addRestaurantBtn" style="margin-bottom:8px;">➕ เพิ่มร้านใหม่</button>
+      <button class="btn btn-outline btn-block" id="reseedBtn" style="margin-bottom:14px;">🔄 เติมข้อมูลร้านตัวอย่าง (ถ้าข้อมูลหาย)</button>
       <div class="table-scroll">
         <table class="admin-table">
           <thead><tr><th>ชื่อร้าน</th><th>ประเภท</th><th>ชั้น</th><th>ราคา</th><th>คะแนน</th><th></th></tr></thead>
@@ -1338,6 +1339,21 @@ function renderAdminTable(){
   }));
 }
 $("#addRestaurantBtn").addEventListener("click",()=>openEditModal(null));
+$("#reseedBtn").addEventListener("click",async ()=>{
+  $("#reseedBtn").disabled = true;
+  $("#reseedBtn").textContent = "⏳ กำลังเติมข้อมูล...";
+  try{
+    const result = await apiFetch("/api/admin/reseed",{method:"POST"});
+    await fetchRestaurants();
+    renderAdminTable();
+    onFiltersChanged();
+    showToast("✅ เติมข้อมูลเรียบร้อย ตอนนี้มีร้านทั้งหมด "+result.restaurantCount+" ร้าน");
+  }catch(err){
+    showToast("⚠️ เติมข้อมูลไม่สำเร็จ: "+err.message);
+  }
+  $("#reseedBtn").disabled = false;
+  $("#reseedBtn").textContent = "🔄 เติมข้อมูลร้านตัวอย่าง (ถ้าข้อมูลหาย)";
+});
 
 function openEditModal(id){
   state.editingId = id;
