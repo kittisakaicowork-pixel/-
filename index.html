@@ -606,85 +606,18 @@ const PRICE_LABEL = {"ถูก":"ถูก (<100฿)","ปานกลาง":"
 const FLOORS = ["B","G","1","2","3","4"];
 const PAX_OPTS = [["solo","คนเดียว"],["2-4","2-4 คน"],["5+","5 คนขึ้นไป"]];
 
-let DATA = [
-  {id:1,name:"Leam Charoen Seafood",type:"ไทย",floor:"B",zone:"โซน B",price:"พรีเมียม",rating:4.3,recommended:["ปูผัดผงกะหรี่","กุ้งเผา","ยำทะเลรวม"],hours:"11:00 - 21:30",tags:["อาหารทะเลสด","เหมาะกับครอบครัว"],contact:"02-958-4001",delivery:["Grab","Robinhood"],pax:["2-4","5+"],isNew:false},
-  {id:2,name:"Nen Neua",type:"ไทย",floor:"B",zone:"โซน B",price:"พรีเมียม",rating:4.4,recommended:["เนื้อย่างเกลือ","ต้มแซ่บเนื้อ","ข้าวเหนียว"],hours:"11:00 - 21:00",tags:["เนื้อคุณภาพพรีเมียม"],contact:"02-958-4002",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-  {id:3,name:"Krua Mae Sri Ruen",type:"ไทย",floor:"2",zone:"โซน Zpell ชั้น 2",price:"ถูก",rating:4.1,recommended:["ผัดกะเพราหมูสับ","แกงเขียวหวานไก่","ข้าวผัดกุ้ง"],hours:"10:00 - 21:00",tags:["อาหารตามสั่งรสมือแม่"],contact:"02-958-4003",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:4,name:"Jeh Daeng Sam Yan",type:"ไทย",floor:"B",zone:"โซน B",price:"ถูก",rating:4.0,recommended:["ข้าวขาหมู","บะหมี่เกี๊ยวหมูแดง"],hours:"10:00 - 20:30",tags:["สตรีทฟู้ดชื่อดัง"],contact:"02-958-4004",delivery:["Lineman","Robinhood"],pax:["solo","2-4"],isNew:false},
-  {id:5,name:"Audrey Cafe & Bistro",type:"ไทย",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.2,recommended:["ผัดไทยกุ้งสด","ข้าวคลุกกะปิ","อัญชันโซดา"],hours:"10:00 - 21:30",tags:["บรรยากาศดี","ถ่ายรูปสวย"],contact:"02-958-4005",delivery:["Grab","Robinhood"],pax:["2-4","5+"],isNew:false},
-
-  {id:6,name:"Fuji Restaurant",type:"ญี่ปุ่น",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.2,recommended:["ซาชิมิรวม","เทมปุระ","ข้าวหน้าปลาไหล"],hours:"10:30 - 21:30",tags:["บรรยากาศดี"],contact:"02-958-4006",delivery:["Grab","Robinhood"],pax:["solo","2-4"],isNew:false},
-  {id:7,name:"Sushiro",type:"ญี่ปุ่น",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.3,recommended:["ซูชิสายพาน","เท็มปุระอุด้ง"],hours:"10:30 - 21:30",tags:["ซูชิสายพาน","คิวเยอะช่วงเย็น"],contact:"02-958-4007",delivery:["Grab"],pax:["solo","2-4"],isNew:false},
-  {id:8,name:"Shinkanzen Sushi",type:"ญี่ปุ่น",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.4,recommended:["ซูชิหน้าปลาแซลมอน","ชุดซาชิมิพรีเมียม"],hours:"11:00 - 21:00",tags:["คิวเยอะช่วงเย็น"],contact:"02-958-4008",delivery:["Grab","Robinhood"],pax:["solo","2-4"],isNew:false},
-  {id:9,name:"Katsuya",type:"ญี่ปุ่น",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.1,recommended:["ทงคัตสึหมู","ข้าวแกงกะหรี่คัตสึ"],hours:"10:00 - 21:00",tags:["ทงคัตสึกรอบนอกนุ่มใน"],contact:"02-958-4009",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:10,name:"Karayama",type:"ญี่ปุ่น",floor:"2",zone:"โซน 2",price:"ถูก",rating:4.0,recommended:["ไก่คาราอาเกะ","ข้าวหน้าไก่ทอด"],hours:"10:00 - 21:00",tags:["ไก่ทอดสไตล์ญี่ปุ่น"],contact:"02-958-4010",delivery:["Grab","Lineman"],pax:["solo"],isNew:false},
-  {id:11,name:"Bankara Ramen",type:"ญี่ปุ่น",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.3,recommended:["ราเมงต้นตำรับ","ราเมงซุปข้น"],hours:"10:30 - 21:00",tags:["ซุปเข้มข้น","New"],contact:"02-958-4011",delivery:["Grab"],pax:["solo","2-4"],isNew:true},
-  {id:12,name:"CoCo ICHIBANYA",type:"ญี่ปุ่น",floor:"G",zone:"โซน G",price:"ปานกลาง",rating:4.2,recommended:["ข้าวแกงกะหรี่หมูทอด","แกงกะหรี่ผักรวม"],hours:"10:00 - 21:30",tags:["ปรับระดับความเผ็ดได้"],contact:"02-958-4012",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:13,name:"Chabuton Ramen",type:"ญี่ปุ่น",floor:"G",zone:"โซน G",price:"ปานกลาง",rating:4.1,recommended:["ราเมงทงคตสึ","เกี๊ยวซ่า"],hours:"10:00 - 21:00",tags:["ราเมงรางวัลระดับโลก"],contact:"02-958-4013",delivery:["Grab"],pax:["solo","2-4"],isNew:false},
-
-  {id:14,name:"Hongmin",type:"จีน/ติ่มซำ",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.2,recommended:["เป็ดปักกิ่ง","ติ่มซำรวม"],hours:"10:00 - 21:00",tags:["จีนกวางตุ้งต้นตำรับ"],contact:"02-958-4014",delivery:["Grab","Robinhood"],pax:["2-4","5+"],isNew:false},
-  {id:15,name:"Liu Xiang Fong",type:"จีน/ติ่มซำ",floor:"2",zone:"โซน Zpell ชั้น 2",price:"ปานกลาง",rating:4.1,recommended:["บะหมี่เป็ดพะโล้","ข้าวหมูแดงฮ่องกง"],hours:"10:00 - 20:30",tags:["สูตรฮ่องกงแท้"],contact:"02-958-4015",delivery:["Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:16,name:"Boon Tong Kee",type:"จีน/ติ่มซำ",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.3,recommended:["ข้าวมันไก่สิงคโปร์","เป็ดพะโล้"],hours:"10:30 - 21:00",tags:["สูตรสิงคโปร์แท้","New"],contact:"02-958-4016",delivery:["Grab","Robinhood"],pax:["solo","2-4"],isNew:true},
-  {id:17,name:"Spicy Cat (La Meow)",type:"จีน/ติ่มซำ",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.0,recommended:["สุกี้หม่าล่า","ไก่ทอดพริกแห้ง"],hours:"11:00 - 21:00",tags:["รสจัดจ้านสไตล์เสฉวน"],contact:"02-958-4017",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-
-  {id:18,name:"Bonchon",type:"เกาหลี",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.3,recommended:["ไก่ทอดซอสเกาหลี","ต๊อกบกกี"],hours:"10:00 - 21:30",tags:["ของหวานยอดฮิต"],contact:"02-958-4018",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:19,name:"Daidomon",type:"เกาหลี",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.1,recommended:["หมูสามชั้นย่างเกาหลี","ซุปคิมจิ"],hours:"11:00 - 21:30",tags:["ปิ้งย่างเกาหลีต้นตำรับ"],contact:"02-958-4019",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-  {id:20,name:"Nice Two Meat U",type:"เกาหลี",floor:"3",zone:"โซน 3",price:"พรีเมียม",rating:4.2,recommended:["หมูย่างเกาหลีบุฟเฟต์","ซัมกยอบซัล"],hours:"11:00 - 22:00",tags:["บุฟเฟต์ปิ้งย่างคุ้มค่า"],contact:"02-958-4020",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-  {id:21,name:"Seoul Garden",type:"เกาหลี",floor:"2",zone:"โซน Zpell ชั้น 2",price:"พรีเมียม",rating:4.0,recommended:["บุฟเฟต์ปิ้งย่างเกาหลี","บิบิมบับ"],hours:"11:00 - 21:30",tags:["บุฟเฟต์นานาชาติเกาหลี"],contact:"02-958-4021",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-  {id:22,name:"Dak Galbi",type:"เกาหลี",floor:"G",zone:"โซน G",price:"ปานกลาง",rating:4.2,recommended:["ไก่ผัดซอสเกาหลี","ต๊อกบกกีชีส"],hours:"10:00 - 21:00",tags:["รสเผ็ดหวานกลมกล่อม"],contact:"02-958-4022",delivery:["Grab","Lineman"],pax:["2-4"],isNew:false},
-  {id:23,name:"BHC Chicken",type:"เกาหลี",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.1,recommended:["ไก่ทอดเกาหลีซอสฮันนี่","วิงส์ทอด"],hours:"10:30 - 21:00",tags:["ไก่ทอดเกาหลียอดฮิต"],contact:"02-958-4023",delivery:["Grab","Lineman","Robinhood"],pax:["solo","2-4"],isNew:false},
-
-  {id:24,name:"Sizzler",type:"ตะวันตก/สเต็ก",floor:"3",zone:"โซน 3",price:"ปานกลาง",rating:4.1,recommended:["สเต็กเนื้อ","สลัดบาร์","ซุปข้าวโพด"],hours:"10:00 - 22:00",tags:["สลัดบาร์ไม่อั้น","เหมาะกับครอบครัว"],contact:"02-958-4024",delivery:["Grab","Lineman","Robinhood"],pax:["2-4","5+"],isNew:false},
-  {id:25,name:"Santa Fe' Steak",type:"ตะวันตก/สเต็ก",floor:"B",zone:"โซน B",price:"ถูก",rating:3.9,recommended:["สเต็กหมู","สปาเก็ตตี้ขี้เมา"],hours:"10:00 - 21:00",tags:["สเต็กราคาคุ้มค่า"],contact:"02-958-4025",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:26,name:"Pizza Hut",type:"ตะวันตก/สเต็ก",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:3.9,recommended:["พิซซ่าฮาวายเอี้ยน","สปาเก็ตตี้คาโบนาร่า"],hours:"10:00 - 21:30",tags:["เหมาะกับครอบครัว"],contact:"02-958-4026",delivery:["Grab","Lineman","Robinhood"],pax:["2-4","5+"],isNew:false},
-  {id:27,name:"เดอะ พิซซ่า คอมปะนี",type:"ตะวันตก/สเต็ก",floor:"3",zone:"โซน 3",price:"ปานกลาง",rating:3.8,recommended:["พิซซ่าซีฟู้ดรวมมิตร","ไก่ป๊อป"],hours:"10:00 - 21:30",tags:["โปรโมชั่นเยอะ"],contact:"02-958-4027",delivery:["Grab","Lineman"],pax:["2-4","5+"],isNew:false},
-
-  {id:28,name:"MK Restaurants",type:"ชาบู/บาร์บีคิว/บุฟเฟต์",floor:"G",zone:"โซน Robinson ชั้น G",price:"ปานกลาง",rating:4.0,recommended:["เป็ดย่าง","สุกี้ชุดครอบครัว","น้ำจิ้มสุกี้รสเด็ด"],hours:"10:00 - 21:00",tags:["เหมาะกับครอบครัว","คิวเยอะช่วงเย็น"],contact:"02-958-4028",delivery:["Grab","Lineman"],pax:["2-4","5+"],isNew:false},
-  {id:29,name:"Bar B Q Plaza",type:"ชาบู/บาร์บีคิว/บุฟเฟต์",floor:"B",zone:"โซน Robinson ชั้น B",price:"ปานกลาง",rating:4.2,recommended:["หมูย่างเกาหลี","ซุปสุกี้","ลูกชิ้นรวม"],hours:"10:00 - 21:30",tags:["บุฟเฟต์คุ้มค่า","คิวเยอะช่วงเย็น"],contact:"02-958-4029",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-  {id:30,name:"Shabushi",type:"ชาบู/บาร์บีคิว/บุฟเฟต์",floor:"B",zone:"โซน B",price:"ปานกลาง",rating:4.0,recommended:["ชาบูสายพาน","ซูชิสายพาน"],hours:"10:00 - 21:30",tags:["บุฟเฟต์คุ้มค่า"],contact:"02-958-4030",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:31,name:"Oishi Eaterium",type:"ชาบู/บาร์บีคิว/บุฟเฟต์",floor:"B",zone:"โซน B",price:"พรีเมียม",rating:4.1,recommended:["บุฟเฟต์ชาบู-ยากินิกุ","ซูชิหน้าปลาแซลมอน"],hours:"11:00 - 21:30",tags:["บุฟเฟต์คุ้มค่า","บรรยากาศดี"],contact:"02-958-4031",delivery:["Grab","Robinhood"],pax:["2-4","5+"],isNew:false},
-  {id:32,name:"Momo Paradise",type:"ชาบู/บาร์บีคิว/บุฟเฟต์",floor:"2",zone:"โซน Zpell ชั้น 2",price:"พรีเมียม",rating:4.4,recommended:["สุกี้ยากี้ญี่ปุ่นพรีเมียม","ไข่ออนเซ็น"],hours:"11:00 - 21:30",tags:["สุกี้ญี่ปุ่นพรีเมียม","New"],contact:"02-958-4032",delivery:["Grab"],pax:["2-4","5+"],isNew:true},
-  {id:33,name:"AKA Japanese Restaurant",type:"ชาบู/บาร์บีคิว/บุฟเฟต์",floor:"B",zone:"โซน B",price:"พรีเมียม",rating:4.0,recommended:["บุฟเฟต์ปิ้งย่างญี่ปุ่น","เนื้อวากิว"],hours:"11:00 - 21:30",tags:["บุฟเฟต์เนื้อพรีเมียม"],contact:"02-958-4033",delivery:["Grab"],pax:["2-4","5+"],isNew:false},
-
-  {id:34,name:"McDonald's",type:"ฟาสต์ฟู้ด",floor:"G",zone:"โซนฟู้ดคอร์ท ชั้น G",price:"ถูก",rating:4.0,recommended:["บิ๊กแมค","แมคนักเก็ต","เฟรนช์ฟรายส์"],hours:"07:00 - 22:00",tags:["เด็กชอบ","เร็วทันใจ"],contact:"02-958-4034",delivery:["Grab","Lineman","Robinhood"],pax:["solo","2-4"],isNew:false},
-  {id:35,name:"KFC",type:"ฟาสต์ฟู้ด",floor:"G",zone:"โซนฟู้ดคอร์ท ชั้น G",price:"ถูก",rating:3.9,recommended:["ไก่ทอดต้นตำรับ","เบอร์เกอร์ไก่","มันบด"],hours:"07:00 - 22:00",tags:["เร็วทันใจ"],contact:"02-958-4035",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:36,name:"Subway",type:"ฟาสต์ฟู้ด",floor:"G",zone:"โซนฟู้ดคอร์ท ชั้น G",price:"ถูก",rating:3.8,recommended:["แซนด์วิชทูน่า","แซนด์วิชไก่ย่าง"],hours:"08:00 - 21:00",tags:["เพื่อสุขภาพ"],contact:"02-958-4036",delivery:["Grab","Lineman"],pax:["solo"],isNew:false},
-  {id:37,name:"Mono+Mono",type:"ฟาสต์ฟู้ด",floor:"2",zone:"โซน 2",price:"ถูก",rating:3.9,recommended:["ไก่ทอดเกาหลีสไตล์อเมริกัน","เฟรนช์ฟรายส์ชีส"],hours:"10:30 - 21:00",tags:["เร็วทันใจ"],contact:"02-958-4037",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-
-  {id:38,name:"Kuay Teow Rua Witsawa",type:"ก๋วยเตี๋ยว",floor:"B",zone:"โซน B",price:"ถูก",rating:4.2,recommended:["ก๋วยเตี๋ยวเรือหมู","เกาเหลาเนื้อตุ๋น"],hours:"09:30 - 20:30",tags:["น้ำซุปเข้มข้น"],contact:"02-958-4038",delivery:["Lineman"],pax:["solo","2-4"],isNew:false},
-  {id:39,name:"Gin Tiew Gun",type:"ก๋วยเตี๋ยว",floor:"B",zone:"โซน B",price:"ถูก",rating:4.0,recommended:["ก๋วยเตี๋ยวต้มยำ","เกี๊ยวทอด"],hours:"10:00 - 20:00",tags:["รสจัดจ้าน"],contact:"02-958-4039",delivery:["Lineman","Robinhood"],pax:["solo"],isNew:false},
-  {id:40,name:"ThaiThai Boat Noodles",type:"ก๋วยเตี๋ยว",floor:"2",zone:"โซน 2",price:"ถูก",rating:4.1,recommended:["ก๋วยเตี๋ยวเรือรสจัด","หมูปิ้ง"],hours:"10:00 - 20:30",tags:["สูตรดั้งเดิม"],contact:"02-958-4040",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false},
-
-  {id:41,name:"After You Dessert Cafe",type:"คาเฟ่/ของหวาน",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.5,recommended:["ชิบูย่าฮันนี่โทสต์","แพนเค้กนมสด","เครปเค้ก"],hours:"10:30 - 21:30",tags:["ของหวานยอดฮิต","คิวเยอะช่วงเย็น"],contact:"02-958-4041",delivery:["Grab","Lineman","Robinhood"],pax:["solo","2-4"],isNew:false},
-  {id:42,name:"Starbucks",type:"คาเฟ่/ของหวาน",floor:"1",zone:"โซน Robinson ชั้น 1",price:"ปานกลาง",rating:4.2,recommended:["คาราเมลมัคคิอาโต้","ชีสเค้ก"],hours:"07:00 - 21:30",tags:["ที่นั่งทำงานดี"],contact:"02-958-4042",delivery:["Grab"],pax:["solo","2-4"],isNew:false},
-  {id:43,name:"Bearhouse Dessert & Milk Tea",type:"คาเฟ่/ของหวาน",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.3,recommended:["ชานมไข่มุกครีมสด","ทาร์ตไข่"],hours:"10:30 - 21:00",tags:["คิวเยอะช่วงเย็น","New"],contact:"02-958-4043",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:true},
-  {id:44,name:"Fire Tiger Dessert Cafe",type:"คาเฟ่/ของหวาน",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.1,recommended:["ชาผลไม้ท็อปครีมชีส","เค้กช็อกโกแลต"],hours:"10:30 - 21:00",tags:["ถ่ายรูปสวย"],contact:"02-958-4044",delivery:["Grab"],pax:["solo","2-4"],isNew:false},
-  {id:45,name:"On the Table Tokyo Cafe",type:"คาเฟ่/ของหวาน",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.0,recommended:["พาสต้าสไตล์ญี่ปุ่น","เครปญี่ปุ่น"],hours:"10:00 - 21:00",tags:["ฟิวชั่นญี่ปุ่น-อิตาเลียน"],contact:"02-958-4045",delivery:["Grab"],pax:["solo","2-4"],isNew:false},
-  {id:46,name:"Salad Factory",type:"คาเฟ่/ของหวาน",floor:"2",zone:"โซน 2",price:"ปานกลาง",rating:4.0,recommended:["สลัดอกไก่ย่าง","สมูทตี้โบวล์"],hours:"09:00 - 21:00",tags:["เพื่อสุขภาพ"],contact:"02-958-4046",delivery:["Grab","Lineman","Robinhood"],pax:["solo"],isNew:false},
-
-  {id:47,name:"แมนดาริน สุกี้&ติ่มซำ",type:"ฮาลาล",floor:"2",zone:"โซน Robinson ชั้น 2",price:"ปานกลาง",rating:4.2,recommended:["สุกี้ฮาลาล","ติ่มซำฮาลาล"],hours:"10:00 - 21:00",tags:["อาหารฮาลาล 100%"],contact:"02-958-4047",delivery:["Grab","Lineman"],pax:["2-4","5+"],isNew:false},
-  {id:48,name:"เซียนเตี๋ยว",type:"ฮาลาล",floor:"2",zone:"The Popsination ชั้น 2 (เหนือโรบินสัน)",price:"ถูก",rating:4.1,recommended:["ก๋วยเตี๋ยวฮาลาล","เกาเหลาฮาลาล"],hours:"10:00 - 20:30",tags:["อาหารฮาลาล 100%","New"],contact:"02-958-4048",delivery:["Lineman"],pax:["solo","2-4"],isNew:true},
-  {id:49,name:"บ้านไก่ทอด ฮาลาล",type:"ฮาลาล",floor:"G",zone:"โซนฟู้ดคอร์ท ชั้น G",price:"ถูก",rating:4.0,recommended:["ไก่ทอดฮาลาล","ข้าวหมกไก่","ชาชักฮาลาล"],hours:"10:00 - 20:00",tags:["อาหารฮาลาล 100%"],contact:"02-958-4049",delivery:["Grab","Lineman"],pax:["solo","2-4"],isNew:false}
-];
-let nextId = 50;
+let DATA = [];
 
 const WHEEL_COLORS = ["#4C9A6A","#6FB98A","#8FD9AE","#3B7D54","#57A773","#7BC99A","#A8DDBB","#2E6B47","#5EC488","#4FA876"];
 
 /* ================= STATE ================= */
-const guestState = {favorites:new Set(), spinHistory:[], visitLog:[], respinLog:[]};
-const globalActivity = {spinHistory:[], visitLog:[], respinLog:[]};
-
 const state = {
   filters:{types:new Set(),prices:new Set(),floors:new Set(),pax:new Set()},
   search:"",
   favOnly:false,
   view:"wheel",
   tab:"home",
-  favorites:guestState.favorites,
-  spinHistory:guestState.spinHistory,
-  searchLog:[],
-  visitLog:guestState.visitLog,
-  respinLog:guestState.respinLog,
+  favorites:new Set(),
   currentUser:null,
   activeUsersToday: 38 + Math.floor(Math.random()*40),
   currentRotation:0,
@@ -694,15 +627,17 @@ const state = {
   authTab:"login"
 };
 
-const USERS = {
-  "admin":{password:"admin",role:"admin",name:"Admin",registeredAt:new Date(),favorites:new Set(),spinHistory:[],visitLog:[],respinLog:[]},
-  "user":{password:"user",role:"user",name:"คุณผู้ใช้",firstName:"คุณ",lastName:"ผู้ใช้",phone:"081-000-0000",email:"user@example.com",age:"25",registeredAt:new Date(),favorites:new Set(),spinHistory:[],visitLog:[],respinLog:[]}
-};
-
 /* ================= HELPERS ================= */
 function $(sel){return document.querySelector(sel);}
 function $all(sel){return document.querySelectorAll(sel);}
 function el(tag,cls,html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!==undefined)e.innerHTML=html; return e;}
+async function apiFetch(url, options){
+  const res = await fetch(url, options);
+  let data = null;
+  try{ data = await res.json(); }catch(e){}
+  if(!res.ok){ throw new Error((data && data.error) || ("คำขอไม่สำเร็จ ("+res.status+")")); }
+  return data;
+}
 function showToast(msg){
   const host = $("#toastHost");
   const t = el("div","toast",msg);
@@ -843,11 +778,8 @@ function spinWheel(){
   const fallbackTimer = setTimeout(onEnd, 4400);
 }
 function logSpin(r){
-  const entry = {id:r.id,name:r.name,time:new Date()};
-  state.spinHistory.unshift(entry);
-  if(state.spinHistory.length>100) state.spinHistory.pop();
-  globalActivity.spinHistory.unshift(entry);
-  if(globalActivity.spinHistory.length>500) globalActivity.spinHistory.pop();
+  apiFetch("/api/activity/spin",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, restaurantId:r.id, restaurantName:r.name})}).catch(()=>{});
 }
 
 /* ================= RESULT MODAL ================= */
@@ -899,6 +831,12 @@ function toggleFavorite(id){
   const list = getFilteredData();
   renderGrid(list);
   if(currentDetailRestaurant && currentDetailRestaurant.id===id) openDetailModal(currentDetailRestaurant);
+  if(state.currentUser){
+    apiFetch("/api/favorites/toggle",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:state.currentUser.username, restaurantId:id})}).catch(()=>{
+        showToast("⚠️ บันทึกรายการโปรดไม่สำเร็จ (ปัญหาการเชื่อมต่อฐานข้อมูล)");
+      });
+  }
 }
 
 /* ================= DETAIL MODAL ================= */
@@ -953,19 +891,13 @@ function deliveryIcon(d){
   return d==="Grab" ? "🟢" : d==="Lineman" ? "🟩" : "🔴";
 }
 function logVisit(r,action){
-  const entry = {id:r.id,name:r.name,action,time:new Date()};
-  state.visitLog.unshift(entry);
-  if(state.visitLog.length>200) state.visitLog.pop();
-  globalActivity.visitLog.unshift(entry);
-  if(globalActivity.visitLog.length>1000) globalActivity.visitLog.pop();
+  apiFetch("/api/activity/visit",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, restaurantId:r.id, restaurantName:r.name, action})}).catch(()=>{});
 }
 function logRespin(r){
   if(!r) return;
-  const entry = {id:r.id,name:r.name,time:new Date()};
-  state.respinLog.unshift(entry);
-  if(state.respinLog.length>200) state.respinLog.pop();
-  globalActivity.respinLog.unshift(entry);
-  if(globalActivity.respinLog.length>1000) globalActivity.respinLog.pop();
+  apiFetch("/api/activity/respin",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, restaurantId:r.id, restaurantName:r.name})}).catch(()=>{});
 }
 let shareTargetRestaurant = null;
 function buildShareMessage(r){
@@ -1039,7 +971,10 @@ $("#searchInput").addEventListener("input", e=>{
 });
 $("#searchInput").addEventListener("change", e=>{
   const v = e.target.value.trim();
-  if(v) state.searchLog.unshift({term:v, time:new Date()});
+  if(v){
+    apiFetch("/api/activity/search",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, term:v})}).catch(()=>{});
+  }
 });
 
 function switchMainTab(tab){
@@ -1081,38 +1016,60 @@ $all(".nav-tab[data-tab]").forEach(t=>t.addEventListener("click",()=>switchMainT
 
 /* ================= PROFILE ================= */
 function fmtDateTime(d){
-  return d.toLocaleString("th-TH",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"});
+  return new Date(d).toLocaleString("th-TH",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"});
 }
-function openProfile(){
+function buildActivityHtml(u, data){
+  const favs = data.favorites || [];
+  const hist = (data.spinHistory||[]).slice(0,30);
+  const visits = (data.visitLog||[]).slice(0,20);
+  const respins = (data.respinLog||[]).slice(0,20);
+  const contactBits = [u.phone,u.email,u.age?u.age+" ปี":""].filter(Boolean).join(" · ");
+  return (
+    '<div class="profile-head">'+
+      '<div class="profile-avatar">'+(u.name?u.name.charAt(0):"?")+'</div>'+
+      '<div><div class="modal-title" style="margin-bottom:2px;">'+u.name+'</div>'+
+      '<div class="modal-sub" style="margin-bottom:0;">'+(u.role==="admin"?"ผู้ดูแลระบบ":"สมาชิก")+(contactBits?" · "+contactBits:"")+
+        (u.registeredAt?' · สมัครเมื่อ '+fmtDateTime(u.registeredAt):"")+'</div></div>'+
+    '</div>'+
+    '<div class="section-mini">❤️ ร้านโปรด ('+favs.length+')</div>'+
+    (favs.length ? favs.map(r=>'<div class="match-item"><div style="font-size:22px;">'+TYPE_EMOJI[r.type]+'</div><div style="flex:1;"><b>'+r.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+r.type+' · ชั้น '+r.floor+'</div></div><button class="mini-btn danger" data-unfav="'+r.id+'">ลบ</button></div>').join("")
+      : '<div class="hint-box">ยังไม่มีร้านโปรด กดหัวใจที่การ์ดร้านเพื่อบันทึก</div>')+
+    '<div class="section-mini">🎡 ประวัติการสุ่ม ('+(data.spinHistory?data.spinHistory.length:0)+' ครั้ง)</div>'+
+    (hist.length ? hist.map(h=>'<div class="log-item">🎯 สุ่มได้ <b style="color:var(--text);">'+h.name+'</b> — '+fmtDateTime(h.time)+'</div>').join("")
+      : '<div class="hint-box">ยังไม่มีประวัติการสุ่ม</div>')+
+    '<div class="section-mini">✅ ใช้บริการจริง ('+(data.visitLog?data.visitLog.length:0)+' ครั้ง)</div>'+
+    (visits.length ? visits.map(v=>'<div class="log-item">✅ '+v.name+' — '+v.action+' — '+fmtDateTime(v.time)+'</div>').join("")
+      : '<div class="hint-box">ยังไม่มีการใช้บริการจริง</div>')+
+    '<div class="section-mini">🔄 สุ่มใหม่ / ปฏิเสธผล ('+(data.respinLog?data.respinLog.length:0)+' ครั้ง)</div>'+
+    (respins.length ? respins.map(v=>'<div class="log-item">🔄 ปฏิเสธ '+v.name+' — '+fmtDateTime(v.time)+'</div>').join("")
+      : '<div class="hint-box">ยังไม่มีการสุ่มใหม่</div>')
+  );
+}
+async function openProfile(){
   if(!state.currentUser){
     openModal("loginOverlay");
     switchMainTab("home");
     return;
   }
   const box = $("#detailModalBox");
-  const favs = DATA.filter(r=>state.favorites.has(r.id));
-  const hist = state.spinHistory.slice(0,30);
-  const u = state.currentUser;
-  const contactBits = [u.phone,u.email,u.age?u.age+" ปี":""].filter(Boolean).join(" · ");
+  box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">กำลังโหลดข้อมูล...</div>';
+  openModal("detailOverlay");
+  let data;
+  try{
+    data = await apiFetch("/api/users/"+encodeURIComponent(state.currentUser.username)+"/activity");
+  }catch(err){
+    box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
+    return;
+  }
+  state.favorites = new Set(data.favorites.map(r=>r.id));
   box.innerHTML =
     '<button class="modal-close" data-close="detailOverlay">✕</button>'+
-    '<div class="profile-head">'+
-      '<div class="profile-avatar">'+u.name.charAt(0)+'</div>'+
-      '<div><div class="modal-title" style="margin-bottom:2px;">'+u.name+'</div>'+
-      '<div class="modal-sub" style="margin-bottom:0;">'+(u.role==="admin"?"ผู้ดูแลระบบ":"สมาชิก")+(contactBits?" · "+contactBits:"")+'</div></div>'+
-    '</div>'+
-    '<div class="section-mini">❤️ ร้านโปรด ('+favs.length+')</div>'+
-    (favs.length ? favs.map(r=>'<div class="match-item"><div style="font-size:22px;">'+TYPE_EMOJI[r.type]+'</div><div style="flex:1;"><b>'+r.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+r.type+' · ชั้น '+r.floor+'</div></div><button class="mini-btn danger" data-unfav="'+r.id+'">ลบ</button></div>').join("")
-      : '<div class="hint-box">ยังไม่มีร้านโปรด กดหัวใจที่การ์ดร้านเพื่อบันทึก</div>')+
-    '<div class="section-mini">🎡 ประวัติการสุ่ม ('+state.spinHistory.length+' ครั้ง)</div>'+
-    (hist.length ? hist.map(h=>'<div class="log-item">🎯 สุ่มได้ <b style="color:var(--text);">'+h.name+'</b> — '+fmtDateTime(h.time)+'</div>').join("")
-      : '<div class="hint-box">ยังไม่มีประวัติการสุ่ม</div>')+
+    buildActivityHtml(state.currentUser, data)+
     '<button class="btn btn-outline btn-block" id="logoutBtn" style="margin-top:16px;">🚪 ออกจากระบบ</button>';
   box.querySelectorAll("[data-unfav]").forEach(b=>{
     b.addEventListener("click",()=>{ toggleFavorite(parseInt(b.dataset.unfav)); openProfile(); });
   });
   box.querySelector("#logoutBtn").addEventListener("click",()=>{ logout(); closeModal("detailOverlay"); });
-  openModal("detailOverlay");
 }
 
 /* ================= AUTH ================= */
@@ -1127,20 +1084,15 @@ function renderAuthArea(){
   }
   $("#adminTabBtn").classList.toggle("hidden", !(state.currentUser && state.currentUser.role==="admin"));
 }
-function login(username,password){
-  const u = USERS[username];
-  if(u && u.password===password){
-    state.currentUser = Object.assign({username,role:u.role,name:u.name}, {
-      firstName:u.firstName||"", lastName:u.lastName||"", phone:u.phone||"", email:u.email||"", age:u.age||""
-    });
-    if(!u.favorites) u.favorites = new Set();
-    if(!u.spinHistory) u.spinHistory = [];
-    if(!u.visitLog) u.visitLog = [];
-    if(!u.respinLog) u.respinLog = [];
-    state.favorites = u.favorites;
-    state.spinHistory = u.spinHistory;
-    state.visitLog = u.visitLog;
-    state.respinLog = u.respinLog;
+async function login(username,password){
+  try{
+    const u = await apiFetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username,password})});
+    state.currentUser = u;
+    try{
+      const activity = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity");
+      state.favorites = new Set(activity.favorites.map(r=>r.id));
+    }catch(e){ state.favorites = new Set(); }
     renderAuthArea();
     closeModal("loginOverlay");
     $("#loginError").style.display="none";
@@ -1148,16 +1100,15 @@ function login(username,password){
     showToast("🎉 ยินดีต้อนรับ, "+u.name+"!");
     onFiltersChanged();
     return true;
+  }catch(err){
+    $("#loginError").textContent = err.message;
+    $("#loginError").style.display="block";
+    return false;
   }
-  $("#loginError").style.display="block";
-  return false;
 }
 function logout(){
   state.currentUser=null;
-  state.favorites = guestState.favorites;
-  state.spinHistory = guestState.spinHistory;
-  state.visitLog = guestState.visitLog;
-  state.respinLog = guestState.respinLog;
+  state.favorites = new Set();
   renderAuthArea();
   switchMainTab("home");
   onFiltersChanged();
@@ -1177,7 +1128,7 @@ $all("#authTabSwitch [data-authtab]").forEach(b=>{
     $("#registerPane").classList.toggle("hidden", state.authTab!=="register");
   });
 });
-function registerUser(){
+async function registerUser(){
   const firstName = $("#regFirstName").value.trim();
   const lastName = $("#regLastName").value.trim();
   const phone = $("#regPhone").value.trim();
@@ -1185,29 +1136,19 @@ function registerUser(){
   const age = $("#regAge").value.trim();
   const username = $("#regUsername").value.trim();
   const password = $("#regPassword").value.trim();
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  if(!firstName||!lastName||!phone||!email||!age||!username||!password){
-    $("#registerError").textContent = "กรุณากรอกข้อมูลให้ครบถ้วน";
+  try{
+    await apiFetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({firstName,lastName,phone,email,age,username,password})});
+    $("#registerError").style.display="none";
+    ["regFirstName","regLastName","regPhone","regEmail","regAge","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
+    showToast("🎉 สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");
+    await login(username, password);
+    document.querySelector('#authTabSwitch [data-authtab="login"]').click();
+  }catch(err){
+    $("#registerError").textContent = err.message;
     $("#registerError").style.display="block";
-    return;
   }
-  if(!emailOk){
-    $("#registerError").textContent = "รูปแบบอีเมลไม่ถูกต้อง";
-    $("#registerError").style.display="block";
-    return;
-  }
-  if(USERS[username]){
-    $("#registerError").textContent = "ชื่อผู้ใช้นี้ถูกใช้แล้ว กรุณาเลือกชื่ออื่น";
-    $("#registerError").style.display="block";
-    return;
-  }
-  USERS[username] = {password, role:"user", name:firstName+" "+lastName, firstName, lastName, phone, email, age, registeredAt:new Date(), favorites:new Set(), spinHistory:[], visitLog:[], respinLog:[]};
-  $("#registerError").style.display="none";
-  ["regFirstName","regLastName","regPhone","regEmail","regAge","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
-  showToast("🎉 สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");
-  login(username, password);
-  document.querySelector('#authTabSwitch [data-authtab="login"]').click();
 }
 $("#registerSubmitBtn").addEventListener("click", registerUser);
 
@@ -1325,59 +1266,49 @@ $all("#adminInnerTabs .nav-tab").forEach(t=>{
   });
 });
 /* ================= ADMIN: CUSTOMERS ================= */
-function renderCustomerTable(){
-  const entries = Object.entries(USERS);
-  $("#customerCount").textContent = "ทั้งหมด "+entries.length+" คน";
+async function renderCustomerTable(){
   const tbody = $("#customerTableBody");
+  tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">กำลังโหลด...</td></tr>';
+  let users;
+  try{
+    users = await apiFetch("/api/users");
+  }catch(err){
+    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</td></tr>';
+    $("#customerCount").textContent = "ทั้งหมด 0 คน";
+    return;
+  }
+  $("#customerCount").textContent = "ทั้งหมด "+users.length+" คน";
   tbody.innerHTML = "";
-  if(!entries.length){
+  if(!users.length){
     tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">ยังไม่มีลูกค้าสมัครสมาชิก</td></tr>';
     return;
   }
-  entries.forEach(([username,u])=>{
-    const favCount = u.favorites ? u.favorites.size : 0;
-    const spinCount = u.spinHistory ? u.spinHistory.length : 0;
+  users.forEach(u=>{
     const tr = el("tr");
-    tr.innerHTML = '<td>'+(u.name||"-")+'</td><td>'+username+'</td><td>'+(u.phone||"-")+'</td><td>'+(u.email||"-")+'</td><td>'+(u.age||"-")+'</td>'+
+    tr.innerHTML = '<td>'+(u.name||"-")+'</td><td>'+u.username+'</td><td>'+(u.phone||"-")+'</td><td>'+(u.email||"-")+'</td><td>'+(u.age||"-")+'</td>'+
       '<td>'+(u.role==="admin"?'<span class="badge-role">ADMIN</span>':'สมาชิก')+'</td>'+
-      '<td>'+favCount+'</td><td>'+spinCount+'</td>'+
-      '<td><button class="mini-btn edit" data-cust="'+username+'">ดูรายละเอียด</button></td>';
+      '<td>'+u.favCount+'</td><td>'+u.spinCount+'</td>'+
+      '<td><button class="mini-btn edit" data-cust="'+u.username+'">ดูรายละเอียด</button></td>';
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll("[data-cust]").forEach(b=>{
     b.addEventListener("click",()=>openCustomerDetail(b.dataset.cust));
   });
 }
-function openCustomerDetail(username){
-  const u = USERS[username];
-  if(!u) return;
+async function openCustomerDetail(username){
   const box = $("#detailModalBox");
-  const favs = u.favorites ? DATA.filter(r=>u.favorites.has(r.id)) : [];
-  const spins = (u.spinHistory||[]).slice(0,20);
-  const visits = (u.visitLog||[]).slice(0,20);
-  const respins = (u.respinLog||[]).slice(0,20);
-  const contactBits = [u.phone,u.email,u.age?u.age+" ปี":""].filter(Boolean).join(" · ");
+  box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">กำลังโหลดข้อมูล...</div>';
+  openModal("detailOverlay");
+  let data;
+  try{
+    data = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity");
+  }catch(err){
+    box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
+    return;
+  }
   box.innerHTML =
     '<button class="modal-close" data-close="detailOverlay">✕</button>'+
-    '<div class="profile-head">'+
-      '<div class="profile-avatar">'+(u.name?u.name.charAt(0):"?")+'</div>'+
-      '<div><div class="modal-title" style="margin-bottom:2px;">'+(u.name||username)+'</div>'+
-      '<div class="modal-sub" style="margin-bottom:0;">Username: '+username+(contactBits?" · "+contactBits:"")+
-        (u.registeredAt?' · สมัครเมื่อ '+fmtDateTime(u.registeredAt):"")+'</div></div>'+
-    '</div>'+
-    '<div class="section-mini">❤️ ร้านโปรด ('+favs.length+')</div>'+
-    (favs.length ? favs.map(r=>'<div class="match-item"><div style="font-size:22px;">'+TYPE_EMOJI[r.type]+'</div><div style="flex:1;"><b>'+r.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+r.type+' · ชั้น '+r.floor+'</div></div></div>').join("")
-      : '<div class="hint-box">ลูกค้าคนนี้ยังไม่มีร้านโปรด</div>')+
-    '<div class="section-mini">🎡 ประวัติการสุ่ม ('+(u.spinHistory?u.spinHistory.length:0)+' ครั้ง)</div>'+
-    (spins.length ? spins.map(h=>'<div class="log-item">🎯 สุ่มได้ <b style="color:var(--text);">'+h.name+'</b> — '+fmtDateTime(h.time)+'</div>').join("")
-      : '<div class="hint-box">ยังไม่มีประวัติการสุ่ม</div>')+
-    '<div class="section-mini">✅ ใช้บริการจริง ('+(u.visitLog?u.visitLog.length:0)+' ครั้ง)</div>'+
-    (visits.length ? visits.map(v=>'<div class="log-item">✅ '+v.name+' — '+v.action+' — '+fmtDateTime(v.time)+'</div>').join("")
-      : '<div class="hint-box">ยังไม่มีการใช้บริการจริง</div>')+
-    '<div class="section-mini">🔄 สุ่มใหม่ / ปฏิเสธผล ('+(u.respinLog?u.respinLog.length:0)+' ครั้ง)</div>'+
-    (respins.length ? respins.map(v=>'<div class="log-item">🔄 ปฏิเสธ '+v.name+' — '+fmtDateTime(v.time)+'</div>').join("")
-      : '<div class="hint-box">ยังไม่มีการสุ่มใหม่</div>');
-  openModal("detailOverlay");
+    buildActivityHtml(data.user, data);
 }
 
 function renderAdminTable(){
@@ -1390,14 +1321,19 @@ function renderAdminTable(){
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll("[data-edit]").forEach(b=>b.addEventListener("click",()=>openEditModal(parseInt(b.dataset.edit))));
-  tbody.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
+  tbody.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",async ()=>{
     const id = parseInt(b.dataset.del);
     const r = DATA.find(x=>x.id===id);
     if(confirm('ยืนยันการลบ "'+r.name+'" ?')){
-      DATA = DATA.filter(x=>x.id!==id);
-      renderAdminTable();
-      onFiltersChanged();
-      showToast("🗑️ ลบร้านแล้ว");
+      try{
+        await apiFetch("/api/restaurants/"+id,{method:"DELETE"});
+        await fetchRestaurants();
+        renderAdminTable();
+        onFiltersChanged();
+        showToast("🗑️ ลบร้านแล้ว");
+      }catch(err){
+        showToast("⚠️ ลบร้านไม่สำเร็จ: "+err.message);
+      }
     }
   }));
 }
@@ -1429,7 +1365,7 @@ function openEditModal(id){
   box.querySelector("#saveRestaurantBtn").addEventListener("click", saveRestaurant);
   openModal("editOverlay");
 }
-function saveRestaurant(){
+async function saveRestaurant(){
   const box = $("#editModalBox");
   const name = box.querySelector("#fName").value.trim();
   if(!name){ showToast("⚠️ กรุณากรอกชื่อร้าน"); return; }
@@ -1450,30 +1386,41 @@ function saveRestaurant(){
     delivery: deliveryVals,
     isNew: box.querySelector("#fNew").checked
   };
-  if(state.editingId){
-    const idx = DATA.findIndex(x=>x.id===state.editingId);
-    DATA[idx] = Object.assign({id:state.editingId}, payload);
-    showToast("✅ แก้ไขร้านเรียบร้อย");
-  } else {
-    DATA.push(Object.assign({id:nextId++}, payload));
-    showToast("✅ เพิ่มร้านใหม่เรียบร้อย");
+  try{
+    if(state.editingId){
+      await apiFetch("/api/restaurants/"+state.editingId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      showToast("✅ แก้ไขร้านเรียบร้อย");
+    } else {
+      await apiFetch("/api/restaurants",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      showToast("✅ เพิ่มร้านใหม่เรียบร้อย");
+    }
+    await fetchRestaurants();
+    closeModal("editOverlay");
+    renderAdminTable();
+    onFiltersChanged();
+  }catch(err){
+    showToast("⚠️ บันทึกไม่สำเร็จ: "+err.message);
   }
-  closeModal("editOverlay");
-  renderAdminTable();
-  onFiltersChanged();
 }
 
 /* ================= ADMIN: ANALYTICS ================= */
-function renderAnalytics(){
-  const allSpins = globalActivity.spinHistory;
-  const allVisits = globalActivity.visitLog;
-  const allRespins = globalActivity.respinLog;
-  const totalFavs = Object.values(USERS).reduce((s,u)=>s+(u.favorites?u.favorites.size:0),0) + guestState.favorites.size;
+async function renderAnalytics(){
+  let analytics;
+  try{
+    analytics = await apiFetch("/api/analytics");
+  }catch(err){
+    showToast("⚠️ โหลดสถิติไม่สำเร็จ: "+err.message);
+    return;
+  }
+  const allSpins = analytics.spinHistory;
+  const allVisits = analytics.visitLog;
+  const allRespins = analytics.respinLog;
+  const allSearches = analytics.searchLog;
 
   $("#statActiveUsers").textContent = state.activeUsersToday;
   $("#statTotalSpins").textContent = allSpins.length;
-  $("#statTotalUsers").textContent = Object.keys(USERS).length;
-  $("#statFavCount").textContent = totalFavs;
+  $("#statTotalUsers").textContent = analytics.totalUsers;
+  $("#statFavCount").textContent = analytics.totalFavorites;
 
   const counts = {};
   allSpins.forEach(h=>{ counts[h.name] = (counts[h.name]||0)+1; });
@@ -1522,10 +1469,10 @@ function renderAnalytics(){
   const logWrap = $("#recentLogList");
   logWrap.innerHTML="";
   const combined = [
-    ...allSpins.slice(0,8).map(h=>({text:"🎯 สุ่มได้ "+h.name,time:h.time})),
-    ...allVisits.slice(0,8).map(v=>({text:"✅ "+v.name+" — "+v.action,time:v.time})),
-    ...allRespins.slice(0,8).map(v=>({text:"🔄 สุ่มใหม่ (ปฏิเสธ "+v.name+")",time:v.time})),
-    ...state.searchLog.slice(0,8).map(s=>({text:"🔍 ค้นหา \""+s.term+"\"",time:s.time}))
+    ...allSpins.slice(0,8).map(h=>({text:"🎯 สุ่มได้ "+h.name,time:new Date(h.time)})),
+    ...allVisits.slice(0,8).map(v=>({text:"✅ "+v.name+" — "+v.action,time:new Date(v.time)})),
+    ...allRespins.slice(0,8).map(v=>({text:"🔄 สุ่มใหม่ (ปฏิเสธ "+v.name+")",time:new Date(v.time)})),
+    ...allSearches.slice(0,8).map(s=>({text:"🔍 ค้นหา \""+s.term+"\"",time:new Date(s.time)}))
   ].sort((a,b)=>b.time-a.time).slice(0,12);
   if(!combined.length){
     logWrap.appendChild(el("div","hint-box","ยังไม่มีกิจกรรมล่าสุด"));
@@ -1537,11 +1484,20 @@ function renderAnalytics(){
 }
 
 /* ================= INIT ================= */
-function init(){
+async function fetchRestaurants(){
+  DATA = await apiFetch("/api/restaurants");
+}
+async function init(){
   initFilters();
   renderAuthArea();
   buildWizardOptions();
-  onFiltersChanged();
+  try{
+    await fetchRestaurants();
+    onFiltersChanged();
+  }catch(err){
+    showToast("⚠️ เชื่อมต่อฐานข้อมูลไม่สำเร็จ: "+err.message);
+    onFiltersChanged();
+  }
 }
 init();
 
