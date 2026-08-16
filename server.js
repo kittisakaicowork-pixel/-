@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 
@@ -11,6 +12,30 @@ const isLocalDb = !DATABASE_URL || DATABASE_URL.includes("localhost") || DATABAS
 const pool = DATABASE_URL
   ? new Pool({ connectionString: DATABASE_URL, ssl: isLocalDb ? false : { rejectUnauthorized: false } })
   : null;
+
+/* ================= SESSIONS (lightweight token auth) ================= */
+// In-memory on purpose: login already doesn't survive a page refresh in this app,
+// so losing sessions on a server restart matches existing behavior.
+const SESSIONS = new Map(); // token -> {username, role}
+function issueToken(username, role) {
+  const token = crypto.randomBytes(24).toString("hex");
+  SESSIONS.set(token, { username, role });
+  return token;
+}
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const session = token && SESSIONS.get(token);
+  if (!session) return res.status(401).json({ error: "กรุณาเข้าสู่ระบบ" });
+  req.authUser = session;
+  next();
+}
+function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.authUser.role !== "admin") return res.status(403).json({ error: "เฉพาะผู้ดูแลระบบเท่านั้น" });
+    next();
+  });
+}
 
 /* ================= SEED DATA ================= */
 const SEED_RESTAURANTS = [
@@ -129,6 +154,20 @@ async function initDb() {
       term TEXT NOT NULL,
       searched_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS feedback (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS reviews (
+      id SERIAL PRIMARY KEY,
+      restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+      username TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      comment TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
 
   await seedRestaurants();
@@ -198,7 +237,7 @@ app.get("/api/restaurants", async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดข้อมูลร้านไม่สำเร็จ" }); }
 });
 
-app.post("/api/restaurants", async (req, res) => {
+app.post("/api/restaurants", requireAdmin, async (req, res) => {
   try {
     const r = req.body;
     const { rows } = await pool.query(
@@ -210,7 +249,7 @@ app.post("/api/restaurants", async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "เพิ่มร้านไม่สำเร็จ" }); }
 });
 
-app.put("/api/restaurants/:id", async (req, res) => {
+app.put("/api/restaurants/:id", requireAdmin, async (req, res) => {
   try {
     const r = req.body;
     const { rows } = await pool.query(
@@ -223,7 +262,7 @@ app.put("/api/restaurants/:id", async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "แก้ไขร้านไม่สำเร็จ" }); }
 });
 
-app.delete("/api/restaurants/:id", async (req, res) => {
+app.delete("/api/restaurants/:id", requireAdmin, async (req, res) => {
   try {
     await pool.query("DELETE FROM restaurants WHERE id=$1", [req.params.id]);
     res.json({ ok: true });
@@ -232,7 +271,7 @@ app.delete("/api/restaurants/:id", async (req, res) => {
 
 // Backfills the 49 seed restaurants + admin/user mock accounts if missing.
 // Safe to call anytime — only inserts rows that don't already exist.
-app.post("/api/admin/reseed", async (req, res) => {
+app.post("/api/admin/reseed", requireAdmin, async (req, res) => {
   try {
     await seedRestaurants();
     await seedUsers();
@@ -260,7 +299,8 @@ app.post("/api/register", async (req, res) => {
        VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8) RETURNING *`,
       [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, age]
     );
-    res.json(mapUserPublic(rows[0]));
+    const token = issueToken(rows[0].username, rows[0].role);
+    res.json(Object.assign(mapUserPublic(rows[0]), { token }));
   } catch (e) { console.error(e); res.status(500).json({ error: "สมัครสมาชิกไม่สำเร็จ" }); }
 });
 
@@ -271,8 +311,16 @@ app.post("/api/login", async (req, res) => {
     if (!rows.length) return res.status(401).json({ error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
     const ok = await bcrypt.compare(password || "", rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
-    res.json(mapUserPublic(rows[0]));
+    const token = issueToken(rows[0].username, rows[0].role);
+    res.json(Object.assign(mapUserPublic(rows[0]), { token }));
   } catch (e) { console.error(e); res.status(500).json({ error: "เข้าสู่ระบบไม่สำเร็จ" }); }
+});
+
+app.post("/api/logout", requireAuth, (req, res) => {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (token) SESSIONS.delete(token);
+  res.json({ ok: true });
 });
 
 /* ================= FAVORITES ================= */
@@ -326,10 +374,64 @@ app.post("/api/activity/search", async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "บันทึกการค้นหาไม่สำเร็จ" }); }
 });
 
+/* ================= FEEDBACK (admin-only visibility) ================= */
+app.post("/api/feedback", requireAuth, async (req, res) => {
+  try {
+    const message = (req.body.message || "").trim();
+    if (!message) return res.status(400).json({ error: "กรุณากรอกข้อความ" });
+    await pool.query("INSERT INTO feedback (username,message) VALUES ($1,$2)", [req.authUser.username, message]);
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: "ส่งความคิดเห็นไม่สำเร็จ" }); }
+});
+
+app.get("/api/feedback", requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT f.id, f.username, u.name AS user_name, f.message, f.created_at
+      FROM feedback f LEFT JOIN users u ON u.username = f.username
+      ORDER BY f.created_at DESC LIMIT 200
+    `);
+    res.json(rows.map(r => ({ id: r.id, username: r.username, name: r.user_name || r.username, message: r.message, time: r.created_at })));
+  } catch (e) { console.error(e); res.status(500).json({ error: "โหลดความคิดเห็นไม่สำเร็จ" }); }
+});
+
+/* ================= RESTAURANT REVIEWS (public) ================= */
+app.get("/api/restaurants/:id/reviews", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT rv.id, rv.username, u.name AS user_name, rv.rating, rv.comment, rv.created_at
+      FROM reviews rv LEFT JOIN users u ON u.username = rv.username
+      WHERE rv.restaurant_id=$1 ORDER BY rv.created_at DESC LIMIT 100
+    `, [req.params.id]);
+    const { rows: avgRows } = await pool.query("SELECT AVG(rating)::float AS avg, COUNT(*) AS count FROM reviews WHERE restaurant_id=$1", [req.params.id]);
+    res.json({
+      reviews: rows.map(r => ({ id: r.id, username: r.username, name: r.user_name || r.username, rating: r.rating, comment: r.comment, time: r.created_at })),
+      average: avgRows[0].avg ? Math.round(avgRows[0].avg * 10) / 10 : null,
+      count: parseInt(avgRows[0].count, 10)
+    });
+  } catch (e) { console.error(e); res.status(500).json({ error: "โหลดรีวิวไม่สำเร็จ" }); }
+});
+
+app.post("/api/restaurants/:id/reviews", requireAuth, async (req, res) => {
+  try {
+    const rating = parseInt(req.body.rating, 10);
+    const comment = (req.body.comment || "").trim();
+    if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: "กรุณาให้คะแนน 1-5 ดาว" });
+    await pool.query(
+      "INSERT INTO reviews (restaurant_id,username,rating,comment) VALUES ($1,$2,$3,$4)",
+      [req.params.id, req.authUser.username, rating, comment || null]
+    );
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: "ส่งรีวิวไม่สำเร็จ" }); }
+});
+
 /* ================= PER-USER ACTIVITY (profile / admin customer detail) ================= */
-app.get("/api/users/:username/activity", async (req, res) => {
+app.get("/api/users/:username/activity", requireAuth, async (req, res) => {
   try {
     const username = req.params.username;
+    if (req.authUser.username !== username && req.authUser.role !== "admin") {
+      return res.status(403).json({ error: "ไม่มีสิทธิ์เข้าถึงข้อมูลนี้" });
+    }
     const { rows: userRows } = await pool.query("SELECT * FROM users WHERE username=$1", [username]);
     if (!userRows.length) return res.status(404).json({ error: "ไม่พบผู้ใช้นี้" });
 
@@ -350,7 +452,7 @@ app.get("/api/users/:username/activity", async (req, res) => {
 });
 
 /* ================= ADMIN: CUSTOMERS ================= */
-app.get("/api/users", async (req, res) => {
+app.get("/api/users", requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT u.*,
@@ -363,7 +465,7 @@ app.get("/api/users", async (req, res) => {
 });
 
 /* ================= ADMIN: ANALYTICS ================= */
-app.get("/api/analytics", async (req, res) => {
+app.get("/api/analytics", requireAdmin, async (req, res) => {
   try {
     const { rows: userCountRows } = await pool.query("SELECT COUNT(*) FROM users");
     const { rows: favCountRows } = await pool.query("SELECT COUNT(*) FROM favorites");

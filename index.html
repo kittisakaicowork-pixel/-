@@ -397,6 +397,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     <div class="admin-tabs" id="adminInnerTabs">
       <button class="nav-tab active" data-atab="data">📦 จัดการร้าน</button>
       <button class="nav-tab" data-atab="customers">👥 ลูกค้า</button>
+      <button class="nav-tab" data-atab="feedback">💬 ความคิดเห็น</button>
       <button class="nav-tab" data-atab="analytics">📊 สถิติ</button>
     </div>
 
@@ -419,6 +420,11 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
           <tbody id="customerTableBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="hidden" id="adminFeedbackPanel">
+      <div class="hint" id="feedbackCount" style="margin-bottom:10px;">ทั้งหมด 0 ข้อความ</div>
+      <div id="feedbackListWrap"></div>
     </div>
 
     <div class="hidden" id="adminAnalyticsPanel">
@@ -560,6 +566,20 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
   </div>
 </div>
 
+<!-- ============ FEEDBACK MODAL ============ -->
+<div class="overlay" id="feedbackOverlay">
+  <div class="modal">
+    <button class="modal-close" data-close="feedbackOverlay">✕</button>
+    <div class="modal-title">💬 ส่งความคิดเห็นถึงทีมงาน</div>
+    <div class="modal-sub">ข้อความของคุณจะเห็นได้เฉพาะผู้ดูแลระบบเท่านั้น</div>
+    <div class="form-group">
+      <textarea class="form-textarea" id="feedbackText" rows="5" placeholder="พิมพ์ความคิดเห็น ข้อเสนอแนะ หรือปัญหาที่พบ..."></textarea>
+    </div>
+    <div class="err-msg" id="feedbackError">กรุณากรอกข้อความ</div>
+    <button class="btn btn-primary btn-block" id="feedbackSubmitBtn">📤 ส่งความคิดเห็น</button>
+  </div>
+</div>
+
 <!-- ============ ADMIN EDIT MODAL ============ -->
 <div class="overlay" id="editOverlay">
   <div class="modal" id="editModalBox"></div>
@@ -641,6 +661,11 @@ async function apiFetch(url, options){
   try{ data = await res.json(); }catch(e){}
   if(!res.ok){ throw new Error((data && data.error) || ("คำขอไม่สำเร็จ ("+res.status+")")); }
   return data;
+}
+function authHeaders(extra){
+  const h = Object.assign({}, extra||{});
+  if(state.currentUser && state.currentUser.token) h["Authorization"] = "Bearer "+state.currentUser.token;
+  return h;
 }
 function showToast(msg){
   const host = $("#toastHost");
@@ -877,7 +902,11 @@ function openDetailModal(r){
     '<div class="delivery-row">'+
       r.delivery.map(d=>'<a class="delivery-pill delivery-link" data-d="'+d+'" target="_blank" rel="noopener" href="https://www.google.com/search?q='+encodeURIComponent(d+" "+r.name+" Future Park Rangsit")+'">'+deliveryIcon(d)+' '+d+'</a>').join("")+
     '</div>'+
-    '<button class="btn btn-outline btn-block" id="shareBtn">🔗 แชร์ร้านนี้ให้เพื่อน</button>';
+    '<button class="btn btn-outline btn-block" id="shareBtn">🔗 แชร์ร้านนี้ให้เพื่อน</button>'+
+    '<div class="section-mini">⭐ รีวิวจากลูกค้า</div>'+
+    '<div id="reviewsSummary" class="hint-box">กำลังโหลดรีวิว...</div>'+
+    '<div id="reviewsList"></div>'+
+    '<div id="reviewFormWrap"></div>';
 
   box.querySelector("#detailFavBtn").addEventListener("click",()=>toggleFavorite(r.id));
   box.querySelector("#callBtn").addEventListener("click",()=>logVisit(r,"โทรจองโต๊ะ"));
@@ -890,6 +919,59 @@ function openDetailModal(r){
   });
   box.querySelector("#shareBtn").addEventListener("click",()=>shareRestaurant(r));
   openModal("detailOverlay");
+  loadReviews(r);
+}
+async function loadReviews(r){
+  let data;
+  try{
+    data = await apiFetch("/api/restaurants/"+r.id+"/reviews");
+  }catch(err){
+    const sumEl = $("#reviewsSummary");
+    if(sumEl) sumEl.textContent = "โหลดรีวิวไม่สำเร็จ: "+err.message;
+    return;
+  }
+  const sumEl = $("#reviewsSummary");
+  if(!sumEl) return;
+  sumEl.className = "";
+  sumEl.innerHTML = data.count
+    ? '⭐ '+data.average.toFixed(1)+' จาก '+data.count+' รีวิว'
+    : '<div class="hint-box">ยังไม่มีรีวิว เป็นคนแรกที่รีวิวร้านนี้!</div>';
+
+  const listEl = $("#reviewsList");
+  listEl.innerHTML = data.reviews.map(rv=>
+    '<div class="log-item"><b style="color:var(--text);">'+rv.name+'</b> — '+"⭐".repeat(rv.rating)+"☆".repeat(5-rv.rating)+
+    (rv.comment ? '<div style="margin-top:2px;">'+rv.comment+'</div>' : '')+
+    '<div style="font-size:11px;color:var(--text-soft);margin-top:2px;">'+fmtDateTime(rv.time)+'</div></div>'
+  ).join("");
+
+  const formWrap = $("#reviewFormWrap");
+  if(!state.currentUser){
+    formWrap.innerHTML = '<div class="hint-box">เข้าสู่ระบบเพื่อเขียนรีวิวร้านนี้</div>';
+    return;
+  }
+  let selectedRating = 5;
+  formWrap.innerHTML =
+    '<div class="wizard-options" id="reviewStars" style="margin-top:8px;">'+
+      [1,2,3,4,5].map(n=>'<div class="wizard-opt" data-star="'+n+'">'+"⭐".repeat(n)+'</div>').join("")+
+    '</div>'+
+    '<div class="form-group" style="margin-top:8px;"><textarea class="form-textarea" id="reviewComment" rows="2" placeholder="เขียนรีวิว (ไม่บังคับ)"></textarea></div>'+
+    '<button class="btn btn-primary btn-block" id="reviewSubmitBtn">📝 ส่งรีวิว</button>';
+  const starEls = formWrap.querySelectorAll("[data-star]");
+  function paintStars(){
+    starEls.forEach(s=>s.classList.toggle("active", parseInt(s.dataset.star,10)<=selectedRating));
+  }
+  paintStars();
+  starEls.forEach(s=>s.addEventListener("click",()=>{ selectedRating=parseInt(s.dataset.star,10); paintStars(); }));
+  formWrap.querySelector("#reviewSubmitBtn").addEventListener("click", async ()=>{
+    try{
+      await apiFetch("/api/restaurants/"+r.id+"/reviews",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),
+        body:JSON.stringify({rating:selectedRating, comment:formWrap.querySelector("#reviewComment").value.trim()})});
+      showToast("✅ ส่งรีวิวเรียบร้อย ขอบคุณครับ!");
+      loadReviews(r);
+    }catch(err){
+      showToast("⚠️ ส่งรีวิวไม่สำเร็จ: "+err.message);
+    }
+  });
 }
 function deliveryIcon(d){
   return d==="Grab" ? "🟢" : d==="Lineman" ? "🟩" : "🔴";
@@ -941,6 +1023,22 @@ $("#shareNativeBtn").addEventListener("click",()=>{
   if(!shareTargetRestaurant || !navigator.share) return;
   const r = shareTargetRestaurant;
   navigator.share({title:r.name, text:buildShareMessage(r)}).catch(()=>{});
+});
+
+/* ================= FEEDBACK ================= */
+$("#feedbackSubmitBtn").addEventListener("click", async ()=>{
+  const message = $("#feedbackText").value.trim();
+  if(!message){ $("#feedbackError").style.display="block"; return; }
+  try{
+    await apiFetch("/api/feedback",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify({message})});
+    $("#feedbackError").style.display="none";
+    $("#feedbackText").value="";
+    closeModal("feedbackOverlay");
+    showToast("🙏 ขอบคุณสำหรับความคิดเห็น!");
+  }catch(err){
+    $("#feedbackError").textContent = err.message;
+    $("#feedbackError").style.display="block";
+  }
 });
 
 /* ================= MODAL SYSTEM ================= */
@@ -1063,7 +1161,7 @@ async function openProfile(){
   openModal("detailOverlay");
   let data;
   try{
-    data = await apiFetch("/api/users/"+encodeURIComponent(state.currentUser.username)+"/activity");
+    data = await apiFetch("/api/users/"+encodeURIComponent(state.currentUser.username)+"/activity",{headers:authHeaders()});
   }catch(err){
     box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
     return;
@@ -1072,10 +1170,12 @@ async function openProfile(){
   box.innerHTML =
     '<button class="modal-close" data-close="detailOverlay">✕</button>'+
     buildActivityHtml(state.currentUser, data)+
-    '<button class="btn btn-outline btn-block" id="logoutBtn" style="margin-top:16px;">🚪 ออกจากระบบ</button>';
+    '<button class="btn btn-outline btn-block" id="profileFeedbackBtn" style="margin-top:16px;">💬 ส่งความคิดเห็นถึงทีมงาน</button>'+
+    '<button class="btn btn-outline btn-block" id="logoutBtn" style="margin-top:8px;">🚪 ออกจากระบบ</button>';
   box.querySelectorAll("[data-unfav]").forEach(b=>{
     b.addEventListener("click",()=>{ toggleFavorite(parseInt(b.dataset.unfav)); openProfile(); });
   });
+  box.querySelector("#profileFeedbackBtn").addEventListener("click",()=>{ openModal("feedbackOverlay"); });
   box.querySelector("#logoutBtn").addEventListener("click",()=>{ logout(); closeModal("detailOverlay"); });
 }
 
@@ -1097,7 +1197,7 @@ async function login(username,password){
       body:JSON.stringify({username,password})});
     state.currentUser = u;
     try{
-      const activity = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity");
+      const activity = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity",{headers:authHeaders()});
       state.favorites = new Set(activity.favorites.map(r=>r.id));
     }catch(e){ state.favorites = new Set(); }
     renderAuthArea();
@@ -1114,6 +1214,9 @@ async function login(username,password){
   }
 }
 function logout(){
+  if(state.currentUser){
+    apiFetch("/api/logout",{method:"POST",headers:authHeaders()}).catch(()=>{});
+  }
   state.currentUser=null;
   state.favorites = new Set();
   renderAuthArea();
@@ -1267,9 +1370,11 @@ $all("#adminInnerTabs .nav-tab").forEach(t=>{
     const tab = t.dataset.atab;
     $("#adminDataPanel").classList.toggle("hidden", tab!=="data");
     $("#adminCustomersPanel").classList.toggle("hidden", tab!=="customers");
+    $("#adminFeedbackPanel").classList.toggle("hidden", tab!=="feedback");
     $("#adminAnalyticsPanel").classList.toggle("hidden", tab!=="analytics");
     if(tab==="analytics") renderAnalytics();
     if(tab==="customers") renderCustomerTable();
+    if(tab==="feedback") renderFeedbackList();
   });
 });
 /* ================= ADMIN: CUSTOMERS ================= */
@@ -1278,7 +1383,7 @@ async function renderCustomerTable(){
   tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">กำลังโหลด...</td></tr>';
   let users;
   try{
-    users = await apiFetch("/api/users");
+    users = await apiFetch("/api/users",{headers:authHeaders()});
   }catch(err){
     tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-soft);">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</td></tr>';
     $("#customerCount").textContent = "ทั้งหมด 0 คน";
@@ -1308,7 +1413,7 @@ async function openCustomerDetail(username){
   openModal("detailOverlay");
   let data;
   try{
-    data = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity");
+    data = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity",{headers:authHeaders()});
   }catch(err){
     box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
     return;
@@ -1316,6 +1421,37 @@ async function openCustomerDetail(username){
   box.innerHTML =
     '<button class="modal-close" data-close="detailOverlay">✕</button>'+
     buildActivityHtml(data.user, data);
+}
+
+/* ================= ADMIN: FEEDBACK ================= */
+async function renderFeedbackList(){
+  const wrap = $("#feedbackListWrap");
+  wrap.innerHTML = '<div class="hint-box">กำลังโหลด...</div>';
+  let items;
+  try{
+    items = await apiFetch("/api/feedback",{headers:authHeaders()});
+  }catch(err){
+    wrap.innerHTML = '<div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
+    $("#feedbackCount").textContent = "ทั้งหมด 0 ข้อความ";
+    return;
+  }
+  $("#feedbackCount").textContent = "ทั้งหมด "+items.length+" ข้อความ";
+  wrap.innerHTML = "";
+  if(!items.length){
+    wrap.appendChild(el("div","hint-box","ยังไม่มีความคิดเห็นจากลูกค้า"));
+    return;
+  }
+  items.forEach(f=>{
+    const row = el("div","match-item");
+    row.style.alignItems = "flex-start";
+    row.innerHTML =
+      '<div style="flex:1;">'+
+        '<div style="font-size:12.5px;"><b>'+f.name+'</b> <span style="color:var(--text-soft);">('+f.username+')</span></div>'+
+        '<div style="font-size:13px;margin:4px 0;white-space:pre-wrap;">'+f.message+'</div>'+
+        '<div style="font-size:11px;color:var(--text-soft);">'+fmtDateTime(f.time)+'</div>'+
+      '</div>';
+    wrap.appendChild(row);
+  });
 }
 
 function renderAdminTable(){
@@ -1333,7 +1469,7 @@ function renderAdminTable(){
     const r = DATA.find(x=>x.id===id);
     if(confirm('ยืนยันการลบ "'+r.name+'" ?')){
       try{
-        await apiFetch("/api/restaurants/"+id,{method:"DELETE"});
+        await apiFetch("/api/restaurants/"+id,{method:"DELETE",headers:authHeaders()});
         await fetchRestaurants();
         renderAdminTable();
         onFiltersChanged();
@@ -1349,7 +1485,7 @@ $("#reseedBtn").addEventListener("click",async ()=>{
   $("#reseedBtn").disabled = true;
   $("#reseedBtn").textContent = "⏳ กำลังเติมข้อมูล...";
   try{
-    const result = await apiFetch("/api/admin/reseed",{method:"POST"});
+    const result = await apiFetch("/api/admin/reseed",{method:"POST",headers:authHeaders()});
     await fetchRestaurants();
     renderAdminTable();
     onFiltersChanged();
@@ -1410,10 +1546,10 @@ async function saveRestaurant(){
   };
   try{
     if(state.editingId){
-      await apiFetch("/api/restaurants/"+state.editingId,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      await apiFetch("/api/restaurants/"+state.editingId,{method:"PUT",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(payload)});
       showToast("✅ แก้ไขร้านเรียบร้อย");
     } else {
-      await apiFetch("/api/restaurants",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      await apiFetch("/api/restaurants",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify(payload)});
       showToast("✅ เพิ่มร้านใหม่เรียบร้อย");
     }
     await fetchRestaurants();
@@ -1429,7 +1565,7 @@ async function saveRestaurant(){
 async function renderAnalytics(){
   let analytics;
   try{
-    analytics = await apiFetch("/api/analytics");
+    analytics = await apiFetch("/api/analytics",{headers:authHeaders()});
   }catch(err){
     showToast("⚠️ โหลดสถิติไม่สำเร็จ: "+err.message);
     return;
