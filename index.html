@@ -833,7 +833,9 @@ function onFiltersChanged(){
   const list = getFilteredData();
   $("#filterResultCount").textContent = "ทั้งหมด "+list.length+" ร้าน";
   drawWheel(list);
-  renderGrid(list);
+  if(!$("#gridSection").classList.contains("hidden")){
+    renderGrid(list);
+  }
 }
 
 /* ================= WHEEL DRAWING ================= */
@@ -863,10 +865,15 @@ window.addEventListener("resize", ()=>{
 
 function drawWheel(list){
   currentWheelList = list;
+  $("#wheelCount").textContent = list.length + " ร้านในวงล้อ";
+  // setupWheelCanvas() forces a synchronous layout read and reallocates the canvas backing
+  // store — real cost, not worth paying on every filter/search keystroke while the wheel
+  // isn't even visible (e.g. on the grid view). Skip the actual draw until it's shown again;
+  // switching back to the wheel triggers a fresh one (see switchMainTab/.toggle-btn).
+  if($("#wheelSection").classList.contains("hidden")) return;
   setupWheelCanvas();
   const radius = R - 4;
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  $("#wheelCount").textContent = list.length + " ร้านในวงล้อ";
   if(list.length===0){
     ctx.beginPath();ctx.arc(R,R,radius,0,Math.PI*2);
     ctx.fillStyle = "#DCEFE2"; ctx.fill();
@@ -1254,6 +1261,7 @@ $all(".toggle-btn").forEach(b=>{
     $("#gridSection").classList.toggle("hidden", state.view!=="grid");
     $("#searchBoxWrap").classList.toggle("hidden", state.view!=="grid");
     $("#favOnlyBtn").classList.toggle("hidden", state.view!=="grid");
+    onFiltersChanged(); // whichever view just became visible was possibly skipped while hidden — refresh it
   });
 });
 $("#favOnlyBtn").addEventListener("click",()=>{
@@ -1262,9 +1270,14 @@ $("#favOnlyBtn").addEventListener("click",()=>{
   $("#favOnlyBtn").style.background = state.favOnly ? "#ffe1e1" : "";
   onFiltersChanged();
 });
+let searchDebounceTimer = null;
 $("#searchInput").addEventListener("input", e=>{
-  state.search = e.target.value.trim();
-  onFiltersChanged();
+  const value = e.target.value.trim();
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(()=>{
+    state.search = value;
+    onFiltersChanged();
+  }, 200);
 });
 $("#searchInput").addEventListener("change", e=>{
   const v = e.target.value.trim();
@@ -1304,6 +1317,7 @@ function switchMainTab(tab){
     $("#gridSection").classList.toggle("hidden", state.view!=="grid");
     $("#searchBoxWrap").classList.toggle("hidden", state.view!=="grid");
     $("#favOnlyBtn").classList.toggle("hidden", state.view!=="grid");
+    drawWheel(currentWheelList); // was possibly skipped while this tab was hidden — refresh it
   } else if(tab==="list"){
     $(".filters").classList.remove("hidden");
     $(".view-toggle-bar").classList.remove("hidden");
