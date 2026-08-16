@@ -125,8 +125,10 @@ async function initDb() {
       phone TEXT,
       email TEXT,
       age TEXT,
+      birthdate DATE,
       registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate DATE;
     CREATE TABLE IF NOT EXISTS favorites (
       username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
       restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -322,8 +324,8 @@ app.post("/api/admin/reseed", requireAdmin, async (req, res) => {
 /* ================= AUTH ================= */
 app.post("/api/register", async (req, res) => {
   try {
-    const { firstName, lastName, phone, email, age, username, password } = req.body;
-    if (!firstName || !lastName || !phone || !email || !age || !username || !password) {
+    const { firstName, lastName, phone, email, age, birthdate, username, password } = req.body;
+    if (!firstName || !lastName || !phone || !email || !age || !birthdate || !username || !password) {
       return res.status(400).json({ error: "กรุณากรอกข้อมูลให้ครบถ้วน" });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -334,13 +336,34 @@ app.post("/api/register", async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
-      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age)
-       VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, age]
+      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age,birthdate)
+       VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, age, birthdate]
     );
     const token = issueToken(rows[0].username, rows[0].role);
     res.json(Object.assign(mapUserPublic(rows[0]), { token }));
   } catch (e) { console.error(e); res.status(500).json({ error: "สมัครสมาชิกไม่สำเร็จ" }); }
+});
+
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { username, birthdate, newPassword } = req.body;
+    if (!username || !birthdate || !newPassword) {
+      return res.status(400).json({ error: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ error: "รหัสผ่านใหม่สั้นเกินไป" });
+    }
+    const { rows } = await pool.query("SELECT username, birthdate FROM users WHERE username=$1", [username]);
+    const genericError = { error: "ชื่อผู้ใช้หรือวันเดือนปีเกิดไม่ถูกต้อง" };
+    if (!rows.length || !rows[0].birthdate) return res.status(401).json(genericError);
+    const onFile = new Date(rows[0].birthdate).toISOString().slice(0, 10);
+    if (onFile !== birthdate) return res.status(401).json(genericError);
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pool.query("UPDATE users SET password_hash=$1 WHERE username=$2", [hash, username]);
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: "รีเซ็ตรหัสผ่านไม่สำเร็จ" }); }
 });
 
 app.post("/api/login", async (req, res) => {

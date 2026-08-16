@@ -502,6 +502,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     <div class="tab-switch" id="authTabSwitch">
       <button class="active" data-authtab="login">เข้าสู่ระบบ</button>
       <button data-authtab="register">สมัครสมาชิก</button>
+      <button data-authtab="reset">ลืมรหัสผ่าน</button>
     </div>
 
     <div id="loginPane">
@@ -517,7 +518,30 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
       </div>
       <div class="err-msg" id="loginError">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>
       <button class="btn btn-primary btn-block" id="loginSubmitBtn">เข้าสู่ระบบ</button>
-      <div class="hint-box">Mock accounts — User: <b>user / user</b> · Admin: <b>admin / admin</b></div>
+      <div class="hint-box">จำรหัสผ่านไม่ได้ใช่ไหม? <span class="reset-link" id="goToResetLink">กดที่นี่เพื่อรีเซ็ตรหัสผ่าน</span></div>
+    </div>
+
+    <div class="hidden" id="resetPane">
+      <div class="modal-title">🔑 รีเซ็ตรหัสผ่าน</div>
+      <div class="modal-sub">ยืนยันตัวตนด้วยวันเดือนปีเกิดที่ใช้ตอนสมัครสมาชิก</div>
+      <div class="form-group">
+        <label class="form-label">ชื่อผู้ใช้</label>
+        <input class="form-input" id="resetUsername" placeholder="ชื่อผู้ใช้ของคุณ">
+      </div>
+      <div class="form-group">
+        <label class="form-label">วันเดือนปีเกิด</label>
+        <input class="form-input" id="resetBirthdate" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">รหัสผ่านใหม่</label>
+        <input class="form-input" id="resetNewPassword" type="password" placeholder="ตั้งรหัสผ่านใหม่">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ยืนยันรหัสผ่านใหม่</label>
+        <input class="form-input" id="resetConfirmPassword" type="password" placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง">
+      </div>
+      <div class="err-msg" id="resetError">ข้อมูลไม่ถูกต้อง</div>
+      <button class="btn btn-primary btn-block" id="resetSubmitBtn">🔄 ตั้งรหัสผ่านใหม่</button>
     </div>
 
     <div class="hidden" id="registerPane">
@@ -542,6 +566,11 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
       <div class="form-group">
         <label class="form-label">อายุ</label>
         <input class="form-input" id="regAge" type="number" min="10" max="100" placeholder="อายุ (ปี)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">วันเดือนปีเกิด</label>
+        <input class="form-input" id="regBirthdate" type="date">
+        <div class="hint-box" style="margin-top:6px;">ใช้สำหรับยืนยันตัวตนตอนรีเซ็ตรหัสผ่าน หากลืมรหัสผ่านในภายหลัง</div>
       </div>
       <div class="form-group">
         <label class="form-label">ชื่อผู้ใช้ (Username)</label>
@@ -1411,37 +1440,72 @@ $("#loginSubmitBtn").addEventListener("click",()=>{
 $("#loginPassword").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#loginSubmitBtn").click(); });
 
 /* ================= REGISTER ================= */
+function switchAuthTab(tab){
+  state.authTab = tab;
+  $all("#authTabSwitch [data-authtab]").forEach(x=>x.classList.toggle("active", x.dataset.authtab===tab));
+  $("#loginPane").classList.toggle("hidden", tab!=="login");
+  $("#registerPane").classList.toggle("hidden", tab!=="register");
+  $("#resetPane").classList.toggle("hidden", tab!=="reset");
+}
 $all("#authTabSwitch [data-authtab]").forEach(b=>{
-  b.addEventListener("click",()=>{
-    state.authTab = b.dataset.authtab;
-    $all("#authTabSwitch [data-authtab]").forEach(x=>x.classList.toggle("active", x===b));
-    $("#loginPane").classList.toggle("hidden", state.authTab!=="login");
-    $("#registerPane").classList.toggle("hidden", state.authTab!=="register");
-  });
+  b.addEventListener("click",()=>switchAuthTab(b.dataset.authtab));
 });
+$("#goToResetLink").addEventListener("click",()=>switchAuthTab("reset"));
 async function registerUser(){
   const firstName = $("#regFirstName").value.trim();
   const lastName = $("#regLastName").value.trim();
   const phone = $("#regPhone").value.trim();
   const email = $("#regEmail").value.trim();
   const age = $("#regAge").value.trim();
+  const birthdate = $("#regBirthdate").value;
   const username = $("#regUsername").value.trim();
   const password = $("#regPassword").value.trim();
 
   try{
     await apiFetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({firstName,lastName,phone,email,age,username,password})});
+      body:JSON.stringify({firstName,lastName,phone,email,age,birthdate,username,password})});
     $("#registerError").style.display="none";
-    ["regFirstName","regLastName","regPhone","regEmail","regAge","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
+    ["regFirstName","regLastName","regPhone","regEmail","regAge","regBirthdate","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
     showToast("🎉 สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");
     await login(username, password);
-    document.querySelector('#authTabSwitch [data-authtab="login"]').click();
+    switchAuthTab("login");
   }catch(err){
     $("#registerError").textContent = err.message;
     $("#registerError").style.display="block";
   }
 }
 $("#registerSubmitBtn").addEventListener("click", registerUser);
+
+/* ================= RESET PASSWORD ================= */
+$("#resetSubmitBtn").addEventListener("click", async ()=>{
+  const username = $("#resetUsername").value.trim();
+  const birthdate = $("#resetBirthdate").value;
+  const newPassword = $("#resetNewPassword").value.trim();
+  const confirmPassword = $("#resetConfirmPassword").value.trim();
+
+  if(!username || !birthdate || !newPassword || !confirmPassword){
+    $("#resetError").textContent = "กรุณากรอกข้อมูลให้ครบถ้วน";
+    $("#resetError").style.display="block";
+    return;
+  }
+  if(newPassword !== confirmPassword){
+    $("#resetError").textContent = "รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน";
+    $("#resetError").style.display="block";
+    return;
+  }
+  try{
+    await apiFetch("/api/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username, birthdate, newPassword})});
+    $("#resetError").style.display="none";
+    ["resetUsername","resetBirthdate","resetNewPassword","resetConfirmPassword"].forEach(id=> $("#"+id).value="");
+    showToast("✅ ตั้งรหัสผ่านใหม่สำเร็จ กรุณาเข้าสู่ระบบ");
+    $("#loginUsername").value = username;
+    switchAuthTab("login");
+  }catch(err){
+    $("#resetError").textContent = err.message;
+    $("#resetError").style.display="block";
+  }
+});
 
 /* ================= SPIN BUTTONS ================= */
 $("#spinBtn").addEventListener("click", spinWheel);
