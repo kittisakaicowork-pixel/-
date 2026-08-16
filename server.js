@@ -371,13 +371,21 @@ app.get("/api/analytics", async (req, res) => {
     const { rows: visits } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, action, visited_at AS time FROM visit_log ORDER BY visited_at DESC LIMIT 1000");
     const { rows: respins } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, respun_at AS time FROM respin_log ORDER BY respun_at DESC LIMIT 1000");
     const { rows: searches } = await pool.query("SELECT term, searched_at AS time FROM search_log ORDER BY searched_at DESC LIMIT 50");
+    const { rows: topFavorited } = await pool.query(`
+      SELECT r.name AS name, COUNT(f.username) AS count
+      FROM favorites f JOIN restaurants r ON r.id = f.restaurant_id
+      GROUP BY r.id, r.name
+      ORDER BY count DESC
+      LIMIT 10
+    `);
     res.json({
       totalUsers: parseInt(userCountRows[0].count, 10),
       totalFavorites: parseInt(favCountRows[0].count, 10),
       spinHistory: spins,
       visitLog: visits,
       respinLog: respins,
-      searchLog: searches
+      searchLog: searches,
+      topFavorited: topFavorited.map(r => ({ name: r.name, count: parseInt(r.count, 10) }))
     });
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดสถิติไม่สำเร็จ" }); }
 });

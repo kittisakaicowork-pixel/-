@@ -433,6 +433,9 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
       <div class="section-mini">🔥 ร้านที่ถูกสุ่มบ่อยที่สุด</div>
       <div id="topSpunList"></div>
 
+      <div class="section-mini">❤️ อันดับร้านที่มีคนถูกใจมากที่สุด</div>
+      <div id="topFavoritedList"></div>
+
       <div class="section-mini">✅ ร้านที่ใช้บริการจริงมากที่สุด</div>
       <div class="hint" style="margin-bottom:8px;">นับเมื่อผู้ใช้กดโทรจองโต๊ะ / จองผ่านแอป / สั่งเดลิเวอรี่ — เปอร์เซ็นต์คำนวณจากยอดใช้บริการจริงทั้งหมด</div>
       <div class="table-scroll">
@@ -990,6 +993,9 @@ function switchMainTab(tab){
   if(tab==="home"){
     $(".filters").classList.remove("hidden");
     $(".view-toggle-bar").classList.remove("hidden");
+    state.view="wheel";
+    $all(".toggle-btn").forEach(x=>x.classList.remove("active"));
+    document.querySelector('.toggle-btn[data-view="wheel"]').classList.add("active");
     $("#wheelSection").classList.toggle("hidden", state.view!=="wheel");
     $("#gridSection").classList.toggle("hidden", state.view!=="grid");
     $("#searchBoxWrap").classList.toggle("hidden", state.view!=="grid");
@@ -1452,6 +1458,21 @@ async function renderAnalytics(){
       row.innerHTML = '<div class="bar-label"><span>'+name+'</span><span>'+count+' ครั้ง</span></div>'+
         '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(count/max*100)+'%"></div></div>';
       topWrap.appendChild(row);
+    });
+  }
+
+  const favWrap = $("#topFavoritedList");
+  favWrap.innerHTML="";
+  const topFav = analytics.topFavorited || [];
+  if(!topFav.length){
+    favWrap.appendChild(el("div","hint-box","ยังไม่มีร้านที่ถูกใจ ลองกดหัวใจที่การ์ดร้านดูก่อน!"));
+  } else {
+    const maxFav = topFav[0].count;
+    topFav.forEach((f,i)=>{
+      const row = el("div","bar-row");
+      row.innerHTML = '<div class="bar-label"><span>#'+(i+1)+' '+f.name+'</span><span>'+f.count+' ถูกใจ</span></div>'+
+        '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(f.count/maxFav*100)+'%"></div></div>';
+      favWrap.appendChild(row);
     });
   }
 
