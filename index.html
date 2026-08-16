@@ -803,18 +803,6 @@ window.addEventListener("resize", ()=>{
   wheelResizeTimer = setTimeout(()=>{ drawWheel(currentWheelList); }, 150);
 });
 
-// Trims text to the longest prefix (+ ellipsis) that fits within maxWidth, using real font metrics.
-function fitTextToWidth(text, maxWidth){
-  if(ctx.measureText(text).width <= maxWidth) return text;
-  let lo = 0, hi = text.length;
-  while(lo < hi){
-    const mid = Math.ceil((lo + hi) / 2);
-    const candidate = text.slice(0, mid) + "…";
-    if(ctx.measureText(candidate).width <= maxWidth) lo = mid; else hi = mid - 1;
-  }
-  return lo > 0 ? text.slice(0, lo) + "…" : "…";
-}
-
 function drawWheel(list){
   currentWheelList = list;
   setupWheelCanvas();
@@ -832,14 +820,6 @@ function drawWheel(list){
   $("#spinBtn").disabled = false; $("#wheelCenterBtn").disabled = false;
   const n = list.length;
   const slice = (Math.PI*2)/n;
-  // Restaurant name always renders (with its cuisine-type emoji) — the name is what
-  // actually identifies the slice, so it never gets dropped in favor of the emoji alone.
-  // Font shrinks and the text budget is computed from real glyph widths as slices get
-  // thinner, so it degrades to a short-but-real fragment instead of disappearing.
-  const fontSize = n<=8 ? 13 : n<=12 ? 12 : n<=20 ? 10.5 : n<=32 ? 9 : 8;
-  const textRadius = radius - 10;
-  const textBudget = Math.max(8, slice * (radius*0.82) * 0.92);
-
   for(let i=0;i<n;i++){
     const start = -Math.PI/2 + i*slice;
     const end = start + slice;
@@ -849,9 +829,6 @@ function drawWheel(list){
     ctx.closePath();
     ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,.5)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
 
     ctx.save();
     ctx.translate(R,R);
@@ -859,17 +836,16 @@ function drawWheel(list){
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#fff";
-    ctx.shadowColor = "rgba(0,0,0,.45)";
+    ctx.shadowColor = "rgba(0,0,0,.5)";
     ctx.shadowBlur = 3;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.font = "bold "+fontSize+"px -apple-system,sans-serif";
-    const label = fitTextToWidth(TYPE_EMOJI[list[i].type]+" "+list[i].name, textBudget);
-    ctx.fillText(label, textRadius, 0);
+    ctx.font = "bold 12px -apple-system,sans-serif";
+    let label = TYPE_EMOJI[list[i].type]+" "+list[i].name;
+    if(label.length>16) label = label.slice(0,15)+"…";
+    ctx.fillText(label, radius-14, 0);
     ctx.restore();
   }
   ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
-  ctx.beginPath();ctx.arc(R,R,radius,0,Math.PI*2);ctx.strokeStyle="rgba(255,255,255,.6)";ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.arc(R,R,radius,0,Math.PI*2);ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=2;ctx.stroke();
 }
 
 function spinWheel(){
