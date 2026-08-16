@@ -342,6 +342,15 @@ app.post("/api/logout", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Used to restore a session after a page refresh (client keeps the token, this verifies it's still valid).
+app.get("/api/me", requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM users WHERE username=$1", [req.authUser.username]);
+    if (!rows.length) return res.status(404).json({ error: "ไม่พบผู้ใช้นี้" });
+    res.json(mapUserPublic(rows[0]));
+  } catch (e) { console.error(e); res.status(500).json({ error: "โหลดข้อมูลผู้ใช้ไม่สำเร็จ" }); }
+});
+
 /* ================= FAVORITES ================= */
 app.get("/api/favorites/:username", async (req, res) => {
   try {

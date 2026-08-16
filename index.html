@@ -70,6 +70,7 @@ a{color:inherit;text-decoration:none;}
   -webkit-background-clip:text;background-clip:text;color:transparent;
 }
 .nav-actions{display:flex;align-items:center;gap:8px;}
+#authArea{display:flex;align-items:center;gap:6px;}
 .icon-btn{
   width:38px;height:38px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
@@ -1275,18 +1276,22 @@ function renderAuthArea(){
   const area = $("#authArea");
   if(state.currentUser){
     area.innerHTML = '<div class="user-chip">👋 '+state.currentUser.name+
-      (state.currentUser.role==="admin"?'<span class="badge-role">ADMIN</span>':'')+'</div>';
+      (state.currentUser.role==="admin"?'<span class="badge-role">ADMIN</span>':'')+'</div>'+
+      '<button class="icon-btn" id="navLogoutBtn" title="ออกจากระบบ">🚪</button>';
+    $("#navLogoutBtn").addEventListener("click",()=>logout());
   } else {
     area.innerHTML = '<button class="nav-pill" id="loginBtn">เข้าสู่ระบบ</button>';
     $("#loginBtn").addEventListener("click",()=>openModal("loginOverlay"));
   }
   $("#adminTabBtn").classList.toggle("hidden", !(state.currentUser && state.currentUser.role==="admin"));
 }
+const AUTH_STORAGE_KEY = "kinAraiDee_token";
 async function login(username,password){
   try{
     const u = await apiFetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({username,password})});
     state.currentUser = u;
+    try{ localStorage.setItem(AUTH_STORAGE_KEY, u.token); }catch(e){}
     try{
       const activity = await apiFetch("/api/users/"+encodeURIComponent(username)+"/activity",{headers:authHeaders()});
       state.favorites = new Set(activity.favorites.map(r=>r.id));
@@ -1308,6 +1313,7 @@ function logout(){
   if(state.currentUser){
     apiFetch("/api/logout",{method:"POST",headers:authHeaders()}).catch(()=>{});
   }
+  try{ localStorage.removeItem(AUTH_STORAGE_KEY); }catch(e){}
   state.currentUser=null;
   state.favorites = new Set();
   renderAuthArea();
@@ -1751,7 +1757,23 @@ async function renderAnalytics(){
 async function fetchRestaurants(){
   DATA = await apiFetch("/api/restaurants");
 }
+async function restoreSession(){
+  let token;
+  try{ token = localStorage.getItem(AUTH_STORAGE_KEY); }catch(e){ return; }
+  if(!token) return;
+  try{
+    const u = await apiFetch("/api/me",{headers:{"Authorization":"Bearer "+token}});
+    state.currentUser = Object.assign(u, {token});
+    try{
+      const activity = await apiFetch("/api/users/"+encodeURIComponent(u.username)+"/activity",{headers:authHeaders()});
+      state.favorites = new Set(activity.favorites.map(r=>r.id));
+    }catch(e){ state.favorites = new Set(); }
+  }catch(e){
+    try{ localStorage.removeItem(AUTH_STORAGE_KEY); }catch(e2){}
+  }
+}
 async function init(){
+  await restoreSession();
   initFilters();
   renderAuthArea();
   buildWizardOptions();
