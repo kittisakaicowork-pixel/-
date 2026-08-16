@@ -1,0 +1,12 @@
+{
+  "name": "kin-arai-dee-future-park-rangsit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "กินอะไรดี? @ Future Park รังสิต - single-file restaurant picker prototype",
+  "scripts": {
+    "start": "serve -s . -l ${PORT:-3000}"
+  },
+  "dependencies": {
+    "serve": "^14.2.3"
+  }
+}
