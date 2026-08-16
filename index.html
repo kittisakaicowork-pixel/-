@@ -326,7 +326,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
   <div class="navbar-inner">
     <div class="logo">🍽️ กินอะไรดี?</div>
     <div class="nav-actions">
-      <button class="icon-btn" id="themeToggle" title="สลับโหมดมืด">🌙</button>
+      <button class="icon-btn" id="themeToggle" title="เลือกธีม">🌙</button>
       <div id="authArea"></div>
     </div>
   </div>
@@ -596,6 +596,20 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     </div>
     <div class="err-msg" id="bookingError">กรุณากรอกข้อมูลให้ครบถ้วน</div>
     <button class="btn btn-primary btn-block" id="bookingSubmitBtn">✅ ยืนยันการจอง</button>
+  </div>
+</div>
+
+<!-- ============ THEME MODAL ============ -->
+<div class="overlay" id="themeOverlay">
+  <div class="modal">
+    <button class="modal-close" data-close="themeOverlay">✕</button>
+    <div class="modal-title">🎨 เลือกธีม</div>
+    <div class="modal-sub">เลือกโหมดสว่าง/มืด หรือให้ตามการตั้งค่าอุปกรณ์อัตโนมัติ</div>
+    <div class="wizard-options" id="themeOptions" style="flex-direction:column;">
+      <div class="wizard-opt" data-theme="light" style="width:100%;text-align:left;">☀️ โหมดสว่าง</div>
+      <div class="wizard-opt" data-theme="dark" style="width:100%;text-align:left;">🌙 โหมดมืด</div>
+      <div class="wizard-opt" data-theme="auto" style="width:100%;text-align:left;">🖥️ ตามอุปกรณ์ (อัตโนมัติ)</div>
+    </div>
   </div>
 </div>
 
@@ -1402,10 +1416,37 @@ $("#resultSpinAgain").addEventListener("click",()=>{
 });
 $("#resultViewDetail").addEventListener("click",()=>{ closeModal("resultOverlay"); openDetailModal(currentResultRestaurant); });
 
-/* ================= THEME TOGGLE ================= */
+/* ================= THEME ================= */
+const THEME_STORAGE_KEY = "kinAraiDee_theme";
+const darkMediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+function getSavedTheme(){
+  try{ return localStorage.getItem(THEME_STORAGE_KEY) || "auto"; }catch(e){ return "auto"; }
+}
+function applyTheme(mode){
+  const effectiveDark = mode==="dark" || (mode==="auto" && darkMediaQuery && darkMediaQuery.matches);
+  document.body.classList.toggle("dark", effectiveDark);
+  $("#themeToggle").textContent = effectiveDark ? "☀️" : "🌙";
+  $all("#themeOptions .wizard-opt").forEach(o=> o.classList.toggle("active", o.dataset.theme===mode));
+}
+function setTheme(mode){
+  try{ localStorage.setItem(THEME_STORAGE_KEY, mode); }catch(e){}
+  applyTheme(mode);
+}
+applyTheme(getSavedTheme());
+if(darkMediaQuery){
+  const onSystemChange = ()=>{ if(getSavedTheme()==="auto") applyTheme("auto"); };
+  if(darkMediaQuery.addEventListener) darkMediaQuery.addEventListener("change", onSystemChange);
+  else if(darkMediaQuery.addListener) darkMediaQuery.addListener(onSystemChange);
+}
 $("#themeToggle").addEventListener("click",()=>{
-  document.body.classList.toggle("dark");
-  $("#themeToggle").textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+  applyTheme(getSavedTheme());
+  openModal("themeOverlay");
+});
+$all("#themeOptions .wizard-opt").forEach(o=>{
+  o.addEventListener("click",()=>{
+    setTheme(o.dataset.theme);
+    closeModal("themeOverlay");
+  });
 });
 
 /* ================= RESET FILTERS ================= */
