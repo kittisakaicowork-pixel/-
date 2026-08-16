@@ -36,6 +36,12 @@ function requireAdmin(req, res, next) {
     next();
   });
 }
+function optionalAuth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  req.authUser = (token && SESSIONS.get(token)) || null;
+  next();
+}
 
 /* ================= SEED DATA ================= */
 const SEED_RESTAURANTS = [
@@ -166,6 +172,19 @@ async function initDb() {
       username TEXT NOT NULL,
       rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
       comment TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS bookings (
+      id SERIAL PRIMARY KEY,
+      username TEXT,
+      restaurant_id INTEGER,
+      restaurant_name TEXT NOT NULL,
+      booking_date DATE NOT NULL,
+      booking_time TEXT NOT NULL,
+      pax INTEGER NOT NULL,
+      booker_name TEXT NOT NULL,
+      booker_phone TEXT NOT NULL,
+      reference_code TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
@@ -425,6 +444,22 @@ app.post("/api/restaurants/:id/reviews", requireAuth, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "ส่งรีวิวไม่สำเร็จ" }); }
 });
 
+/* ================= BOOKINGS ================= */
+app.post("/api/bookings", optionalAuth, async (req, res) => {
+  try {
+    const { restaurantId, restaurantName, date, time, pax, name, phone, ref } = req.body;
+    if (!restaurantName || !date || !time || !pax || !name || !phone || !ref) {
+      return res.status(400).json({ error: "ข้อมูลการจองไม่ครบถ้วน" });
+    }
+    await pool.query(
+      `INSERT INTO bookings (username,restaurant_id,restaurant_name,booking_date,booking_time,pax,booker_name,booker_phone,reference_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [req.authUser ? req.authUser.username : null, restaurantId || null, restaurantName, date, time, pax, name, phone, ref]
+    );
+    res.json({ ok: true });
+  } catch (e) { console.error(e); res.status(500).json({ error: "บันทึกการจองไม่สำเร็จ" }); }
+});
+
 /* ================= PER-USER ACTIVITY (profile / admin customer detail) ================= */
 app.get("/api/users/:username/activity", requireAuth, async (req, res) => {
   try {
@@ -440,13 +475,20 @@ app.get("/api/users/:username/activity", requireAuth, async (req, res) => {
     const { rows: spins } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, spun_at AS time FROM spin_history WHERE username=$1 ORDER BY spun_at DESC LIMIT 100", [username]);
     const { rows: visits } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, action, visited_at AS time FROM visit_log WHERE username=$1 ORDER BY visited_at DESC LIMIT 200", [username]);
     const { rows: respins } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, respun_at AS time FROM respin_log WHERE username=$1 ORDER BY respun_at DESC LIMIT 200", [username]);
+    const { rows: bookings } = await pool.query(
+      `SELECT restaurant_id AS id, restaurant_name AS name, booking_date AS date, booking_time AS time,
+              pax, booker_name AS "bookerName", booker_phone AS "bookerPhone", reference_code AS ref, created_at AS "createdAt"
+       FROM bookings WHERE username=$1 ORDER BY created_at DESC LIMIT 100`,
+      [username]
+    );
 
     res.json({
       user: mapUserPublic(userRows[0]),
       favorites: rest.map(mapRestaurant),
       spinHistory: spins,
       visitLog: visits,
-      respinLog: respins
+      respinLog: respins,
+      bookings: bookings
     });
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดข้อมูลผู้ใช้ไม่สำเร็จ" }); }
 });

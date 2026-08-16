@@ -1068,6 +1068,8 @@ $("#bookingSubmitBtn").addEventListener("click",()=>{
   $("#bookingError").style.display = "none";
   const ref = generateBookingRef();
   logVisit(r,"จองผ่านแอป");
+  apiFetch("/api/bookings",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),
+    body:JSON.stringify({restaurantId:r.id, restaurantName:r.name, date, time, pax, name, phone, ref})}).catch(()=>{});
   closeModal("bookingOverlay");
   showToast("✅ จองโต๊ะสำเร็จ! รหัสอ้างอิง "+ref);
   const msg =
@@ -1208,6 +1210,7 @@ function buildActivityHtml(u, data){
   const hist = (data.spinHistory||[]).slice(0,30);
   const visits = (data.visitLog||[]).slice(0,20);
   const respins = (data.respinLog||[]).slice(0,20);
+  const bookings = (data.bookings||[]).slice(0,20);
   const contactBits = [u.phone,u.email,u.age?u.age+" ปี":""].filter(Boolean).join(" · ");
   return (
     '<div class="profile-head">'+
@@ -1219,6 +1222,14 @@ function buildActivityHtml(u, data){
     '<div class="section-mini">❤️ ร้านโปรด ('+favs.length+')</div>'+
     (favs.length ? favs.map(r=>'<div class="match-item"><div style="font-size:22px;">'+TYPE_EMOJI[r.type]+'</div><div style="flex:1;"><b>'+r.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+r.type+' · ชั้น '+r.floor+'</div></div><button class="mini-btn danger" data-unfav="'+r.id+'">ลบ</button></div>').join("")
       : '<div class="hint-box">ยังไม่มีร้านโปรด กดหัวใจที่การ์ดร้านเพื่อบันทึก</div>')+
+    '<div class="section-mini">📅 รายการจองของฉัน ('+(data.bookings?data.bookings.length:0)+')</div>'+
+    (bookings.length ? bookings.map(b=>
+      '<div class="match-item"><div style="font-size:22px;">📅</div><div style="flex:1;">'+
+        '<b>'+b.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+
+        String(b.date).slice(0,10)+' เวลา '+b.time+' น. · '+b.pax+' ท่าน · รหัส '+b.ref+
+      '</div></div></div>'
+    ).join("")
+      : '<div class="hint-box">ยังไม่มีรายการจอง ลองกด "จองผ่านแอป" ที่หน้ารายละเอียดร้านดูก่อน</div>')+
     '<div class="section-mini">🎡 ประวัติการสุ่ม ('+(data.spinHistory?data.spinHistory.length:0)+' ครั้ง)</div>'+
     (hist.length ? hist.map(h=>'<div class="log-item">🎯 สุ่มได้ <b style="color:var(--text);">'+h.name+'</b> — '+fmtDateTime(h.time)+'</div>').join("")
       : '<div class="hint-box">ยังไม่มีประวัติการสุ่ม</div>')+
