@@ -566,6 +566,37 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
   </div>
 </div>
 
+<!-- ============ BOOKING MODAL ============ -->
+<div class="overlay" id="bookingOverlay">
+  <div class="modal">
+    <button class="modal-close" data-close="bookingOverlay">✕</button>
+    <div class="modal-title">📲 จองโต๊ะผ่านแอป</div>
+    <div class="modal-sub" id="bookingRestaurantName"></div>
+    <div class="form-group">
+      <label class="form-label">วันที่</label>
+      <input class="form-input" type="date" id="bookDate">
+    </div>
+    <div class="form-group">
+      <label class="form-label">เวลา</label>
+      <input class="form-input" type="time" id="bookTime">
+    </div>
+    <div class="form-group">
+      <label class="form-label">จำนวนผู้ใช้บริการ</label>
+      <input class="form-input" type="number" min="1" max="30" id="bookPax" value="2">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ชื่อผู้จอง</label>
+      <input class="form-input" id="bookName" placeholder="ชื่อผู้จอง">
+    </div>
+    <div class="form-group">
+      <label class="form-label">เบอร์ติดต่อ</label>
+      <input class="form-input" type="tel" id="bookPhone" placeholder="เบอร์โทรศัพท์">
+    </div>
+    <div class="err-msg" id="bookingError">กรุณากรอกข้อมูลให้ครบถ้วน</div>
+    <button class="btn btn-primary btn-block" id="bookingSubmitBtn">✅ ยืนยันการจอง</button>
+  </div>
+</div>
+
 <!-- ============ FEEDBACK MODAL ============ -->
 <div class="overlay" id="feedbackOverlay">
   <div class="modal">
@@ -910,10 +941,7 @@ function openDetailModal(r){
 
   box.querySelector("#detailFavBtn").addEventListener("click",()=>toggleFavorite(r.id));
   box.querySelector("#callBtn").addEventListener("click",()=>logVisit(r,"โทรจองโต๊ะ"));
-  box.querySelector("#bookAppBtn").addEventListener("click",()=>{
-    logVisit(r,"จองผ่านแอป");
-    showToast("✅ จองโต๊ะสำเร็จ (Mock) — เราจะติดต่อยืนยันทาง SMS");
-  });
+  box.querySelector("#bookAppBtn").addEventListener("click",()=>openBookingModal(r));
   box.querySelectorAll(".delivery-link").forEach(a=>{
     a.addEventListener("click",()=>logVisit(r,"สั่งเดลิเวอรี่ ("+a.dataset.d+")"));
   });
@@ -993,12 +1021,64 @@ function buildShareMessage(r){
     : "";
   return safeUrl ? shareText+" "+safeUrl : shareText;
 }
-function shareRestaurant(r){
-  shareTargetRestaurant = r;
-  $("#shareText").value = buildShareMessage(r);
+function openShareModalWithText(text, r){
+  shareTargetRestaurant = r || null;
+  $("#shareText").value = text;
   $("#shareNativeBtn").classList.toggle("hidden", !navigator.share);
   openModal("shareOverlay");
 }
+function shareRestaurant(r){
+  openShareModalWithText(buildShareMessage(r), r);
+}
+
+/* ================= BOOKING ================= */
+let bookingTargetRestaurant = null;
+function openBookingModal(r){
+  bookingTargetRestaurant = r;
+  $("#bookingRestaurantName").textContent = r.name+" · "+locationText(r);
+  const today = new Date();
+  const todayStr = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+  $("#bookDate").value = todayStr;
+  $("#bookDate").min = todayStr;
+  $("#bookTime").value = "18:00";
+  $("#bookPax").value = 2;
+  $("#bookName").value = state.currentUser ? state.currentUser.name : "";
+  $("#bookPhone").value = state.currentUser ? state.currentUser.phone : "";
+  $("#bookingError").style.display = "none";
+  openModal("bookingOverlay");
+}
+function generateBookingRef(){
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "FP";
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+$("#bookingSubmitBtn").addEventListener("click",()=>{
+  const r = bookingTargetRestaurant;
+  if(!r) return;
+  const date = $("#bookDate").value;
+  const time = $("#bookTime").value;
+  const pax = $("#bookPax").value.trim();
+  const name = $("#bookName").value.trim();
+  const phone = $("#bookPhone").value.trim();
+  if(!date || !time || !pax || !name || !phone){
+    $("#bookingError").style.display = "block";
+    return;
+  }
+  $("#bookingError").style.display = "none";
+  const ref = generateBookingRef();
+  logVisit(r,"จองผ่านแอป");
+  closeModal("bookingOverlay");
+  showToast("✅ จองโต๊ะสำเร็จ! รหัสอ้างอิง "+ref);
+  const msg =
+    "🍽️ ร้าน: "+r.name+" ("+locationText(r)+")\n"+
+    "วันที่: "+date+"  เวลา: "+time+" น.\n"+
+    "จำนวน: "+pax+" ท่าน\n"+
+    "ชื่อผู้จอง: "+name+"\n"+
+    "เบอร์ติดต่อ: "+phone+"\n"+
+    "รหัสอ้างอิง: "+ref;
+  openShareModalWithText(msg, r);
+});
 function copyShareText(){
   const ta = $("#shareText");
   ta.focus();
@@ -1020,9 +1100,9 @@ function copyShareText(){
 }
 $("#shareCopyBtn").addEventListener("click", copyShareText);
 $("#shareNativeBtn").addEventListener("click",()=>{
-  if(!shareTargetRestaurant || !navigator.share) return;
-  const r = shareTargetRestaurant;
-  navigator.share({title:r.name, text:buildShareMessage(r)}).catch(()=>{});
+  if(!navigator.share) return;
+  const title = shareTargetRestaurant ? shareTargetRestaurant.name : "กินอะไรดี?";
+  navigator.share({title, text:$("#shareText").value}).catch(()=>{});
 });
 
 /* ================= FEEDBACK ================= */
