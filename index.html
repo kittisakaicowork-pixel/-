@@ -427,7 +427,15 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
 
     <div class="hidden" id="adminFeedbackPanel">
       <div class="hint" id="feedbackCount" style="margin-bottom:10px;">ทั้งหมด 0 ข้อความ</div>
-      <div id="feedbackListWrap"></div>
+
+      <div class="section-mini">👍 สิ่งที่ลูกค้าชอบ (<span id="goodFeedbackCount">0</span>)</div>
+      <div id="goodFeedbackList"></div>
+
+      <div class="section-mini">👎 สิ่งที่ลูกค้าไม่ชอบ (<span id="badFeedbackCount">0</span>)</div>
+      <div id="badFeedbackList"></div>
+
+      <div class="section-mini">💡 สิ่งที่ควรปรับปรุง (<span id="improvementFeedbackCount">0</span>)</div>
+      <div id="improvementFeedbackList"></div>
     </div>
 
     <div class="hidden" id="adminAnalyticsPanel">
@@ -653,6 +661,14 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     <button class="modal-close" data-close="feedbackOverlay">✕</button>
     <div class="modal-title">💬 ส่งความคิดเห็นถึงทีมงาน</div>
     <div class="modal-sub">ข้อความของคุณจะเห็นได้เฉพาะผู้ดูแลระบบเท่านั้น</div>
+    <div class="form-group">
+      <label class="form-label">ประเภทความคิดเห็น</label>
+      <div class="wizard-options" id="feedbackTypeOptions">
+        <div class="wizard-opt" data-fbtype="good">👍 สิ่งที่ชอบ</div>
+        <div class="wizard-opt" data-fbtype="bad">👎 สิ่งที่ไม่ชอบ</div>
+        <div class="wizard-opt" data-fbtype="improvement">💡 สิ่งที่ควรปรับปรุง</div>
+      </div>
+    </div>
     <div class="form-group">
       <textarea class="form-textarea" id="feedbackText" rows="5" placeholder="พิมพ์ความคิดเห็น ข้อเสนอแนะ หรือปัญหาที่พบ..."></textarea>
     </div>
@@ -1179,13 +1195,23 @@ $("#shareNativeBtn").addEventListener("click",()=>{
 });
 
 /* ================= FEEDBACK ================= */
+let selectedFeedbackType = null;
+$all("#feedbackTypeOptions .wizard-opt").forEach(o=>{
+  o.addEventListener("click",()=>{
+    selectedFeedbackType = o.dataset.fbtype;
+    $all("#feedbackTypeOptions .wizard-opt").forEach(x=>x.classList.toggle("active", x===o));
+  });
+});
 $("#feedbackSubmitBtn").addEventListener("click", async ()=>{
   const message = $("#feedbackText").value.trim();
-  if(!message){ $("#feedbackError").style.display="block"; return; }
+  if(!selectedFeedbackType){ $("#feedbackError").textContent="กรุณาเลือกประเภทความคิดเห็น"; $("#feedbackError").style.display="block"; return; }
+  if(!message){ $("#feedbackError").textContent="กรุณากรอกข้อความ"; $("#feedbackError").style.display="block"; return; }
   try{
-    await apiFetch("/api/feedback",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify({message})});
+    await apiFetch("/api/feedback",{method:"POST",headers:authHeaders({"Content-Type":"application/json"}),body:JSON.stringify({type:selectedFeedbackType, message})});
     $("#feedbackError").style.display="none";
     $("#feedbackText").value="";
+    selectedFeedbackType = null;
+    $all("#feedbackTypeOptions .wizard-opt").forEach(x=>x.classList.remove("active"));
     closeModal("feedbackOverlay");
     showToast("🙏 ขอบคุณสำหรับความคิดเห็น!");
   }catch(err){
@@ -1699,21 +1725,12 @@ async function openCustomerDetail(username){
 }
 
 /* ================= ADMIN: FEEDBACK ================= */
-async function renderFeedbackList(){
-  const wrap = $("#feedbackListWrap");
-  wrap.innerHTML = '<div class="hint-box">กำลังโหลด...</div>';
-  let items;
-  try{
-    items = await apiFetch("/api/feedback",{headers:authHeaders()});
-  }catch(err){
-    wrap.innerHTML = '<div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
-    $("#feedbackCount").textContent = "ทั้งหมด 0 ข้อความ";
-    return;
-  }
-  $("#feedbackCount").textContent = "ทั้งหมด "+items.length+" ข้อความ";
+function renderFeedbackGroup(listId, countId, items, emptyMsg){
+  const wrap = $("#"+listId);
+  $("#"+countId).textContent = items.length;
   wrap.innerHTML = "";
   if(!items.length){
-    wrap.appendChild(el("div","hint-box","ยังไม่มีความคิดเห็นจากลูกค้า"));
+    wrap.appendChild(el("div","hint-box",emptyMsg));
     return;
   }
   items.forEach(f=>{
@@ -1727,6 +1744,25 @@ async function renderFeedbackList(){
       '</div>';
     wrap.appendChild(row);
   });
+}
+async function renderFeedbackList(){
+  ["goodFeedbackList","badFeedbackList","improvementFeedbackList"].forEach(id=>{
+    $("#"+id).innerHTML = '<div class="hint-box">กำลังโหลด...</div>';
+  });
+  let items;
+  try{
+    items = await apiFetch("/api/feedback",{headers:authHeaders()});
+  }catch(err){
+    ["goodFeedbackList","badFeedbackList","improvementFeedbackList"].forEach(id=>{
+      $("#"+id).innerHTML = '<div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
+    });
+    $("#feedbackCount").textContent = "ทั้งหมด 0 ข้อความ";
+    return;
+  }
+  $("#feedbackCount").textContent = "ทั้งหมด "+items.length+" ข้อความ";
+  renderFeedbackGroup("goodFeedbackList", "goodFeedbackCount", items.filter(f=>f.type==="good"), "ยังไม่มีความคิดเห็นด้านดี");
+  renderFeedbackGroup("badFeedbackList", "badFeedbackCount", items.filter(f=>f.type==="bad"), "ยังไม่มีความคิดเห็นด้านลบ");
+  renderFeedbackGroup("improvementFeedbackList", "improvementFeedbackCount", items.filter(f=>f.type==="improvement"), "ยังไม่มีข้อเสนอแนะการปรับปรุง");
 }
 
 function renderAdminTable(){

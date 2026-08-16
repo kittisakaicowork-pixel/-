@@ -165,9 +165,11 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS feedback (
       id SERIAL PRIMARY KEY,
       username TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'improvement',
       message TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE feedback ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'improvement';
     CREATE TABLE IF NOT EXISTS reviews (
       id SERIAL PRIMARY KEY,
       restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -447,11 +449,14 @@ app.post("/api/activity/search", async (req, res) => {
 });
 
 /* ================= FEEDBACK (admin-only visibility) ================= */
+const FEEDBACK_TYPES = ["good", "bad", "improvement"];
 app.post("/api/feedback", requireAuth, async (req, res) => {
   try {
     const message = (req.body.message || "").trim();
+    const type = FEEDBACK_TYPES.includes(req.body.type) ? req.body.type : null;
     if (!message) return res.status(400).json({ error: "กรุณากรอกข้อความ" });
-    await pool.query("INSERT INTO feedback (username,message) VALUES ($1,$2)", [req.authUser.username, message]);
+    if (!type) return res.status(400).json({ error: "กรุณาเลือกประเภทความคิดเห็น" });
+    await pool.query("INSERT INTO feedback (username,type,message) VALUES ($1,$2,$3)", [req.authUser.username, type, message]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: "ส่งความคิดเห็นไม่สำเร็จ" }); }
 });
@@ -459,11 +464,11 @@ app.post("/api/feedback", requireAuth, async (req, res) => {
 app.get("/api/feedback", requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT f.id, f.username, u.name AS user_name, f.message, f.created_at
+      SELECT f.id, f.username, u.name AS user_name, f.type, f.message, f.created_at
       FROM feedback f LEFT JOIN users u ON u.username = f.username
       ORDER BY f.created_at DESC LIMIT 200
     `);
-    res.json(rows.map(r => ({ id: r.id, username: r.username, name: r.user_name || r.username, message: r.message, time: r.created_at })));
+    res.json(rows.map(r => ({ id: r.id, username: r.username, name: r.user_name || r.username, type: r.type, message: r.message, time: r.created_at })));
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดความคิดเห็นไม่สำเร็จ" }); }
 });
 
