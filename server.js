@@ -137,30 +137,43 @@ async function initDb() {
     CREATE TABLE IF NOT EXISTS spin_history (
       id SERIAL PRIMARY KEY,
       username TEXT,
+      visitor_id TEXT,
       restaurant_id INTEGER,
       restaurant_name TEXT NOT NULL,
       spun_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE spin_history ADD COLUMN IF NOT EXISTS visitor_id TEXT;
     CREATE TABLE IF NOT EXISTS visit_log (
       id SERIAL PRIMARY KEY,
       username TEXT,
+      visitor_id TEXT,
       restaurant_id INTEGER,
       restaurant_name TEXT NOT NULL,
       action TEXT NOT NULL,
       visited_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE visit_log ADD COLUMN IF NOT EXISTS visitor_id TEXT;
     CREATE TABLE IF NOT EXISTS respin_log (
       id SERIAL PRIMARY KEY,
       username TEXT,
+      visitor_id TEXT,
       restaurant_id INTEGER,
       restaurant_name TEXT NOT NULL,
       respun_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+    ALTER TABLE respin_log ADD COLUMN IF NOT EXISTS visitor_id TEXT;
     CREATE TABLE IF NOT EXISTS search_log (
       id SERIAL PRIMARY KEY,
       username TEXT,
+      visitor_id TEXT,
       term TEXT NOT NULL,
       searched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    ALTER TABLE search_log ADD COLUMN IF NOT EXISTS visitor_id TEXT;
+    CREATE TABLE IF NOT EXISTS visitors (
+      visitor_id TEXT PRIMARY KEY,
+      first_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE TABLE IF NOT EXISTS feedback (
       id SERIAL PRIMARY KEY,
@@ -252,7 +265,16 @@ const ACTIVE_WINDOW_MS = 90 * 1000; // no heartbeat in this long = considered go
 
 app.post("/api/heartbeat", (req, res) => {
   const { visitorId } = req.body || {};
-  if (visitorId) ACTIVE_VISITORS.set(visitorId, Date.now());
+  if (visitorId) {
+    ACTIVE_VISITORS.set(visitorId, Date.now());
+    if (pool) {
+      pool.query(
+        `INSERT INTO visitors (visitor_id, first_seen, last_seen) VALUES ($1, now(), now())
+         ON CONFLICT (visitor_id) DO UPDATE SET last_seen = now()`,
+        [visitorId]
+      ).catch(e => console.error("heartbeat db write failed:", e.message));
+    }
+  }
   res.json({ ok: true });
 });
 
@@ -421,29 +443,29 @@ app.post("/api/favorites/toggle", async (req, res) => {
 /* ================= ACTIVITY LOGGING ================= */
 app.post("/api/activity/spin", async (req, res) => {
   try {
-    const { username, restaurantId, restaurantName } = req.body;
-    await pool.query("INSERT INTO spin_history (username,restaurant_id,restaurant_name) VALUES ($1,$2,$3)", [username || null, restaurantId, restaurantName]);
+    const { username, visitorId, restaurantId, restaurantName } = req.body;
+    await pool.query("INSERT INTO spin_history (username,visitor_id,restaurant_id,restaurant_name) VALUES ($1,$2,$3,$4)", [username || null, visitorId || null, restaurantId, restaurantName]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: "บันทึกการสุ่มไม่สำเร็จ" }); }
 });
 app.post("/api/activity/visit", async (req, res) => {
   try {
-    const { username, restaurantId, restaurantName, action } = req.body;
-    await pool.query("INSERT INTO visit_log (username,restaurant_id,restaurant_name,action) VALUES ($1,$2,$3,$4)", [username || null, restaurantId, restaurantName, action]);
+    const { username, visitorId, restaurantId, restaurantName, action } = req.body;
+    await pool.query("INSERT INTO visit_log (username,visitor_id,restaurant_id,restaurant_name,action) VALUES ($1,$2,$3,$4,$5)", [username || null, visitorId || null, restaurantId, restaurantName, action]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: "บันทึกการใช้บริการไม่สำเร็จ" }); }
 });
 app.post("/api/activity/respin", async (req, res) => {
   try {
-    const { username, restaurantId, restaurantName } = req.body;
-    await pool.query("INSERT INTO respin_log (username,restaurant_id,restaurant_name) VALUES ($1,$2,$3)", [username || null, restaurantId, restaurantName]);
+    const { username, visitorId, restaurantId, restaurantName } = req.body;
+    await pool.query("INSERT INTO respin_log (username,visitor_id,restaurant_id,restaurant_name) VALUES ($1,$2,$3,$4)", [username || null, visitorId || null, restaurantId, restaurantName]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: "บันทึกการสุ่มใหม่ไม่สำเร็จ" }); }
 });
 app.post("/api/activity/search", async (req, res) => {
   try {
-    const { username, term } = req.body;
-    if (term) await pool.query("INSERT INTO search_log (username,term) VALUES ($1,$2)", [username || null, term]);
+    const { username, visitorId, term } = req.body;
+    if (term) await pool.query("INSERT INTO search_log (username,visitor_id,term) VALUES ($1,$2,$3)", [username || null, visitorId || null, term]);
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: "บันทึกการค้นหาไม่สำเร็จ" }); }
 });
@@ -589,6 +611,25 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       ORDER BY count DESC
       LIMIT 10
     `);
+    const { rows: funnelRows } = await pool.query(`
+      WITH activity_visitor_ids AS (
+        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL
+        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL
+        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL
+      ),
+      guest_activity_visitor_ids AS (
+        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL AND username IS NULL
+        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL AND username IS NULL
+        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL AND username IS NULL
+      )
+      SELECT
+        (SELECT COUNT(*) FROM visitors) AS total_visitors,
+        (SELECT COUNT(*) FROM activity_visitor_ids) AS used_service_visitors,
+        (SELECT COUNT(*) FROM guest_activity_visitor_ids) AS guest_used_service_visitors
+    `);
+    const fr = funnelRows[0];
+    const totalVisitors = parseInt(fr.total_visitors, 10);
+    const usedServiceVisitors = parseInt(fr.used_service_visitors, 10);
     res.json({
       totalUsers: parseInt(userCountRows[0].count, 10),
       totalFavorites: parseInt(favCountRows[0].count, 10),
@@ -598,7 +639,12 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       searchLog: searches,
       topFavorited: topFavorited.map(r => ({ name: r.name, count: parseInt(r.count, 10) })),
       totalSearches: parseInt(searchCountRows[0].count, 10),
-      topSearches: topSearches.map(r => ({ term: r.term, count: parseInt(r.count, 10) }))
+      topSearches: topSearches.map(r => ({ term: r.term, count: parseInt(r.count, 10) })),
+      visitorFunnel: {
+        totalVisitors,
+        visitedNoService: Math.max(0, totalVisitors - usedServiceVisitors),
+        usedServiceNoAccount: parseInt(fr.guest_used_service_visitors, 10)
+      }
     });
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดสถิติไม่สำเร็จ" }); }
 });

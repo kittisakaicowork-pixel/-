@@ -448,6 +448,16 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
         <div class="stat-card"><div class="stat-num" id="statFavCount">--</div><div class="stat-lbl">ยอดถูกใจรวม</div></div>
         <div class="stat-card"><div class="stat-num" id="statTotalSearches">--</div><div class="stat-lbl">จำนวนครั้งที่ค้นหา</div></div>
       </div>
+
+      <div class="section-mini">📊 ภาพรวมผู้เข้าใช้งาน</div>
+      <div class="hint" style="margin-bottom:8px;">นับจากอุปกรณ์/เบราว์เซอร์ที่เคยเข้าเว็บ (visitor) เทียบกับการใช้บริการจริงและการสมัครสมาชิก</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-num" id="statTotalVisitors">--</div><div class="stat-lbl">👀 เข้ามาเยี่ยมชมทั้งหมด</div></div>
+        <div class="stat-card"><div class="stat-num" id="statVisitedNoService">--</div><div class="stat-lbl">😴 เข้ามาแต่ไม่ได้ใช้บริการ</div></div>
+        <div class="stat-card"><div class="stat-num" id="statUsedNoAccount">--</div><div class="stat-lbl">🎯 ใช้บริการแต่ไม่ได้ลงทะเบียน</div></div>
+        <div class="stat-card"><div class="stat-num" id="statRegistered">--</div><div class="stat-lbl">✅ เข้ามาและลงทะเบียนแล้ว</div></div>
+      </div>
+
       <div class="section-mini">🔥 ร้านที่ถูกสุ่มบ่อยที่สุด</div>
       <div id="topSpunList"></div>
 
@@ -926,7 +936,7 @@ function spinWheel(){
 }
 function logSpin(r){
   apiFetch("/api/activity/spin",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, restaurantId:r.id, restaurantName:r.name})}).catch(()=>{});
+    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, visitorId:VISITOR_ID, restaurantId:r.id, restaurantName:r.name})}).catch(()=>{});
 }
 
 /* ================= RESULT MODAL ================= */
@@ -1093,12 +1103,12 @@ function deliveryIcon(d){
 }
 function logVisit(r,action){
   apiFetch("/api/activity/visit",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, restaurantId:r.id, restaurantName:r.name, action})}).catch(()=>{});
+    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, visitorId:VISITOR_ID, restaurantId:r.id, restaurantName:r.name, action})}).catch(()=>{});
 }
 function logRespin(r){
   if(!r) return;
   apiFetch("/api/activity/respin",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, restaurantId:r.id, restaurantName:r.name})}).catch(()=>{});
+    body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, visitorId:VISITOR_ID, restaurantId:r.id, restaurantName:r.name})}).catch(()=>{});
 }
 let shareTargetRestaurant = null;
 function buildShareMessage(r){
@@ -1260,7 +1270,7 @@ $("#searchInput").addEventListener("change", e=>{
   const v = e.target.value.trim();
   if(v){
     apiFetch("/api/activity/search",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, term:v})}).catch(()=>{});
+      body:JSON.stringify({username:state.currentUser?state.currentUser.username:null, visitorId:VISITOR_ID, term:v})}).catch(()=>{});
   }
 });
 
@@ -1891,6 +1901,12 @@ async function renderAnalytics(){
   $("#statTotalUsers").textContent = analytics.totalUsers;
   $("#statFavCount").textContent = analytics.totalFavorites;
   $("#statTotalSearches").textContent = analytics.totalSearches;
+
+  const funnel = analytics.visitorFunnel || {totalVisitors:0, visitedNoService:0, usedServiceNoAccount:0};
+  $("#statTotalVisitors").textContent = funnel.totalVisitors;
+  $("#statVisitedNoService").textContent = funnel.visitedNoService;
+  $("#statUsedNoAccount").textContent = funnel.usedServiceNoAccount;
+  $("#statRegistered").textContent = analytics.totalUsers;
 
   const counts = {};
   allSpins.forEach(h=>{ counts[h.name] = (counts[h.name]||0)+1; });
