@@ -241,6 +241,26 @@ function mapUserPublic(row) {
   };
 }
 
+/* ================= REAL-TIME ACTIVE USERS (in-memory, no DB needed) ================= */
+const ACTIVE_VISITORS = new Map(); // visitorId -> last heartbeat (ms)
+const ACTIVE_WINDOW_MS = 90 * 1000; // no heartbeat in this long = considered gone
+
+app.post("/api/heartbeat", (req, res) => {
+  const { visitorId } = req.body || {};
+  if (visitorId) ACTIVE_VISITORS.set(visitorId, Date.now());
+  res.json({ ok: true });
+});
+
+app.get("/api/active-users", (req, res) => {
+  const now = Date.now();
+  let count = 0;
+  for (const [id, ts] of ACTIVE_VISITORS) {
+    if (now - ts <= ACTIVE_WINDOW_MS) count++;
+    else ACTIVE_VISITORS.delete(id);
+  }
+  res.json({ activeNow: count });
+});
+
 /* ================= MIDDLEWARE ================= */
 function requireDb(req, res, next) {
   if (!pool) return res.status(503).json({ error: "ยังไม่ได้ตั้งค่าฐานข้อมูล (DATABASE_URL) กรุณาเพิ่ม PostgreSQL ใน Railway แล้ว deploy ใหม่" });
@@ -531,6 +551,15 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       ORDER BY count DESC
       LIMIT 10
     `);
+    const { rows: searchCountRows } = await pool.query("SELECT COUNT(*) FROM search_log");
+    const { rows: topSearches } = await pool.query(`
+      SELECT LOWER(TRIM(term)) AS term, COUNT(*) AS count
+      FROM search_log
+      WHERE term IS NOT NULL AND TRIM(term) <> ''
+      GROUP BY LOWER(TRIM(term))
+      ORDER BY count DESC
+      LIMIT 10
+    `);
     res.json({
       totalUsers: parseInt(userCountRows[0].count, 10),
       totalFavorites: parseInt(favCountRows[0].count, 10),
@@ -538,7 +567,9 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       visitLog: visits,
       respinLog: respins,
       searchLog: searches,
-      topFavorited: topFavorited.map(r => ({ name: r.name, count: parseInt(r.count, 10) }))
+      topFavorited: topFavorited.map(r => ({ name: r.name, count: parseInt(r.count, 10) })),
+      totalSearches: parseInt(searchCountRows[0].count, 10),
+      topSearches: topSearches.map(r => ({ term: r.term, count: parseInt(r.count, 10) }))
     });
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดสถิติไม่สำเร็จ" }); }
 });

@@ -432,18 +432,22 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
 
     <div class="hidden" id="adminAnalyticsPanel">
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-num" id="statActiveUsers">--</div><div class="stat-lbl">ผู้ใช้งานวันนี้ (Active Users)</div></div>
+        <div class="stat-card"><div class="stat-num" id="statActiveUsers">--</div><div class="stat-lbl">🟢 กำลังใช้งานอยู่ตอนนี้ (Real-time)</div></div>
         <div class="stat-card"><div class="stat-num" id="statTotalSpins">--</div><div class="stat-lbl">จำนวนครั้งที่หมุนวงล้อ</div></div>
         <div class="stat-card"><div class="stat-num" id="statTotalVisits">--</div><div class="stat-lbl">ใช้บริการจริง (ครั้ง / %)</div></div>
         <div class="stat-card"><div class="stat-num" id="statTotalRespins">--</div><div class="stat-lbl">สุ่มใหม่ / ปฏิเสธผล (ครั้ง / %)</div></div>
         <div class="stat-card"><div class="stat-num" id="statTotalUsers">--</div><div class="stat-lbl">บัญชีลูกค้าที่สมัครแล้ว</div></div>
         <div class="stat-card"><div class="stat-num" id="statFavCount">--</div><div class="stat-lbl">ยอดถูกใจรวม</div></div>
+        <div class="stat-card"><div class="stat-num" id="statTotalSearches">--</div><div class="stat-lbl">จำนวนครั้งที่ค้นหา</div></div>
       </div>
       <div class="section-mini">🔥 ร้านที่ถูกสุ่มบ่อยที่สุด</div>
       <div id="topSpunList"></div>
 
       <div class="section-mini">❤️ อันดับร้านที่มีคนถูกใจมากที่สุด</div>
       <div id="topFavoritedList"></div>
+
+      <div class="section-mini">🔍 อันดับคำค้นหายอดนิยม</div>
+      <div id="topSearchList"></div>
 
       <div class="section-mini">✅ ร้านที่ใช้บริการจริงมากที่สุด</div>
       <div class="hint" style="margin-bottom:8px;">นับเมื่อผู้ใช้กดโทรจองโต๊ะ / จองผ่านแอป / สั่งเดลิเวอรี่ — เปอร์เซ็นต์คำนวณจากยอดใช้บริการจริงทั้งหมด</div>
@@ -691,7 +695,6 @@ const state = {
   tab:"home",
   favorites:new Set(),
   currentUser:null,
-  activeUsersToday: 38 + Math.floor(Math.random()*40),
   currentRotation:0,
   spinning:false,
   wizard:{type:null,price:null,pax:null},
@@ -1770,10 +1773,11 @@ async function renderAnalytics(){
   const allRespins = analytics.respinLog;
   const allSearches = analytics.searchLog;
 
-  $("#statActiveUsers").textContent = state.activeUsersToday;
+  refreshActiveUsers();
   $("#statTotalSpins").textContent = allSpins.length;
   $("#statTotalUsers").textContent = analytics.totalUsers;
   $("#statFavCount").textContent = analytics.totalFavorites;
+  $("#statTotalSearches").textContent = analytics.totalSearches;
 
   const counts = {};
   allSpins.forEach(h=>{ counts[h.name] = (counts[h.name]||0)+1; });
@@ -1804,6 +1808,21 @@ async function renderAnalytics(){
       row.innerHTML = '<div class="bar-label"><span>#'+(i+1)+' '+f.name+'</span><span>'+f.count+' ถูกใจ</span></div>'+
         '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(f.count/maxFav*100)+'%"></div></div>';
       favWrap.appendChild(row);
+    });
+  }
+
+  const searchWrap = $("#topSearchList");
+  searchWrap.innerHTML="";
+  const topSearch = analytics.topSearches || [];
+  if(!topSearch.length){
+    searchWrap.appendChild(el("div","hint-box","ยังไม่มีข้อมูลการค้นหา ลองพิมพ์ค้นหาร้านดูก่อน!"));
+  } else {
+    const maxSearch = topSearch[0].count;
+    topSearch.forEach((s,i)=>{
+      const row = el("div","bar-row");
+      row.innerHTML = '<div class="bar-label"><span>#'+(i+1)+' "'+s.term+'"</span><span>'+s.count+' ครั้ง</span></div>'+
+        '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(s.count/maxSearch*100)+'%"></div></div>';
+      searchWrap.appendChild(row);
     });
   }
 
@@ -1855,6 +1874,42 @@ async function renderAnalytics(){
 async function fetchRestaurants(){
   DATA = await apiFetch("/api/restaurants");
 }
+
+/* ================= REAL-TIME ACTIVE USERS (heartbeat) ================= */
+const VISITOR_ID_KEY = "kinAraiDee_visitorId";
+function makeRandomId(){
+  return (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2)));
+}
+function getOrCreateVisitorId(){
+  try{
+    let id = localStorage.getItem(VISITOR_ID_KEY);
+    if(!id){ id = makeRandomId(); localStorage.setItem(VISITOR_ID_KEY, id); }
+    return id;
+  }catch(e){ return makeRandomId(); }
+}
+const VISITOR_ID = getOrCreateVisitorId();
+function sendHeartbeat(){
+  if(document.visibilityState !== "visible") return;
+  apiFetch("/api/heartbeat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({visitorId:VISITOR_ID})}).catch(()=>{});
+}
+function startHeartbeat(){
+  sendHeartbeat();
+  setInterval(sendHeartbeat, 25000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") sendHeartbeat(); });
+}
+async function refreshActiveUsers(){
+  try{
+    const r = await apiFetch("/api/active-users");
+    $("#statActiveUsers").textContent = r.activeNow;
+  }catch(e){}
+}
+function startActiveUsersPolling(){
+  setInterval(()=>{
+    if(!(state.currentUser && state.currentUser.role==="admin")) return;
+    if($("#adminAnalyticsPanel").classList.contains("hidden")) return;
+    refreshActiveUsers();
+  }, 12000);
+}
 async function restoreSession(){
   let token;
   try{ token = localStorage.getItem(AUTH_STORAGE_KEY); }catch(e){ return; }
@@ -1875,6 +1930,8 @@ async function init(){
   initFilters();
   renderAuthArea();
   buildWizardOptions();
+  startHeartbeat();
+  startActiveUsersPolling();
   try{
     await fetchRestaurants();
     onFiltersChanged();
