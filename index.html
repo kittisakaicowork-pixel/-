@@ -137,6 +137,7 @@ a{color:inherit;text-decoration:none;}
   border-top:28px solid var(--primary-dark);z-index:5;filter:drop-shadow(0 3px 3px rgba(0,0,0,.3));
 }
 #wheelCanvas{
+  display:block;width:100%;height:100%;
   border-radius:50%;box-shadow:0 0 0 8px var(--card-bg),0 0 0 10px var(--primary),var(--shadow-lg);
   background:var(--card-bg);
 }
@@ -780,17 +781,50 @@ function onFiltersChanged(){
 /* ================= WHEEL DRAWING ================= */
 const canvas = document.getElementById("wheelCanvas");
 const ctx = canvas.getContext("2d");
-const R = canvas.width/2;
+let R = 170;
 let currentWheelList = [];
+
+function setupWheelCanvas(){
+  // rect.width reads 0 while the wheel is hidden (e.g. on the list tab) or before first
+  // paint, so fall back to the same min(88vw,360px) formula the CSS uses rather than a
+  // guessed constant — keeps sizing correct even when we can't measure the live layout.
+  const rect = canvas.getBoundingClientRect();
+  const fallback = Math.min(window.innerWidth * 0.88, 360);
+  const size = Math.round(rect.width || fallback);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  R = size / 2;
+}
+let wheelResizeTimer = null;
+window.addEventListener("resize", ()=>{
+  clearTimeout(wheelResizeTimer);
+  wheelResizeTimer = setTimeout(()=>{ drawWheel(currentWheelList); }, 150);
+});
+
+// Trims text to the longest prefix (+ ellipsis) that fits within maxWidth, using real font metrics.
+function fitTextToWidth(text, maxWidth){
+  if(ctx.measureText(text).width <= maxWidth) return text;
+  let lo = 0, hi = text.length;
+  while(lo < hi){
+    const mid = Math.ceil((lo + hi) / 2);
+    const candidate = text.slice(0, mid) + "…";
+    if(ctx.measureText(candidate).width <= maxWidth) lo = mid; else hi = mid - 1;
+  }
+  return lo > 0 ? text.slice(0, lo) + "…" : "…";
+}
 
 function drawWheel(list){
   currentWheelList = list;
+  setupWheelCanvas();
+  const radius = R - 4;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   $("#wheelCount").textContent = list.length + " ร้านในวงล้อ";
   if(list.length===0){
-    ctx.beginPath();ctx.arc(R,R,R-4,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(R,R,radius,0,Math.PI*2);
     ctx.fillStyle = "#DCEFE2"; ctx.fill();
-    ctx.fillStyle="#999"; ctx.font="14px sans-serif"; ctx.textAlign="center";
+    ctx.fillStyle="#999"; ctx.font="14px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.fillText("ไม่มีร้านตรงเงื่อนไข", R, R);
     $("#spinBtn").disabled = true; $("#wheelCenterBtn").disabled = true;
     return;
@@ -798,27 +832,50 @@ function drawWheel(list){
   $("#spinBtn").disabled = false; $("#wheelCenterBtn").disabled = false;
   const n = list.length;
   const slice = (Math.PI*2)/n;
+  const rawFontSize = n<=8 ? 13 : n<=12 ? 12 : 11;
+  const textBudget = Math.max(4, slice * (radius*0.72) * 0.9);
+  // Once the per-slice width can't fit more than a couple of characters after the emoji,
+  // a truncated fragment isn't actually readable — switch to a bigger centered emoji instead.
+  const emojiOnly = textBudget < 58;
+  const fontSize = emojiOnly ? Math.min(16, Math.max(11, radius*0.09)) : rawFontSize;
+  const textRadius = radius - (emojiOnly ? radius*0.32 : 12);
+
   for(let i=0;i<n;i++){
     const start = -Math.PI/2 + i*slice;
     const end = start + slice;
     ctx.beginPath();
     ctx.moveTo(R,R);
-    ctx.arc(R,R,R-4,start,end);
+    ctx.arc(R,R,radius,start,end);
     ctx.closePath();
     ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
     ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.5)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
     ctx.save();
     ctx.translate(R,R);
     ctx.rotate(start + slice/2);
-    ctx.textAlign="right";
-    ctx.fillStyle="#fff";
-    ctx.font="bold 12px -apple-system,sans-serif";
-    let label = TYPE_EMOJI[list[i].type]+" "+list[i].name;
-    if(label.length>16) label = label.slice(0,15)+"…";
-    ctx.fillText(label, R-14, 4);
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#fff";
+    ctx.shadowColor = "rgba(0,0,0,.4)";
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    if(emojiOnly){
+      ctx.textAlign = "center";
+      ctx.font = fontSize+"px -apple-system,sans-serif";
+      ctx.fillText(TYPE_EMOJI[list[i].type], textRadius, 0);
+    } else {
+      ctx.textAlign = "right";
+      ctx.font = "bold "+fontSize+"px -apple-system,sans-serif";
+      const label = fitTextToWidth(TYPE_EMOJI[list[i].type]+" "+list[i].name, textBudget);
+      ctx.fillText(label, textRadius, 0);
+    }
     ctx.restore();
   }
-  ctx.beginPath();ctx.arc(R,R,R-4,0,Math.PI*2);ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=2;ctx.stroke();
+  ctx.shadowColor = "transparent"; ctx.shadowBlur = 0;
+  ctx.beginPath();ctx.arc(R,R,radius,0,Math.PI*2);ctx.strokeStyle="rgba(255,255,255,.6)";ctx.lineWidth=2;ctx.stroke();
 }
 
 function spinWheel(){
