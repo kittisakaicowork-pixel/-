@@ -334,6 +334,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     <button class="nav-tab active" data-tab="home">🎡 หมุนเลือก</button>
     <button class="nav-tab" data-tab="list">📋 รายการร้าน</button>
     <button class="nav-tab" data-tab="profile">👤 โปรไฟล์</button>
+    <button class="nav-tab" data-tab="bookings">📅 การจอง</button>
     <button class="nav-tab hidden" id="adminTabBtn" data-tab="admin">🛠️ Admin</button>
   </div>
 </header>
@@ -1127,7 +1128,13 @@ $("#feedbackSubmitBtn").addEventListener("click", async ()=>{
 /* ================= MODAL SYSTEM ================= */
 function openModal(id){ $("#"+id).classList.add("open"); document.body.style.overflow="hidden"; }
 function closeModal(id){ $("#"+id).classList.remove("open"); document.body.style.overflow=""; }
-$all("[data-close]").forEach(b=>b.addEventListener("click",()=>closeModal(b.dataset.close)));
+// Delegated on document (not bound per-button) because modal content like
+// #detailModalBox/#editModalBox gets its close button injected dynamically
+// via innerHTML long after this script runs — a direct binding would miss it.
+document.addEventListener("click", e=>{
+  const closeBtn = e.target.closest("[data-close]");
+  if(closeBtn) closeModal(closeBtn.dataset.close);
+});
 $all(".overlay").forEach(o=>{
   o.addEventListener("click",e=>{ if(e.target===o) closeModal(o.id); });
 });
@@ -1193,6 +1200,8 @@ function switchMainTab(tab){
     renderGrid(getFilteredData());
   } else if(tab==="profile"){
     openProfile();
+  } else if(tab==="bookings"){
+    openMyBookings();
   } else if(tab==="admin"){
     if(!state.currentUser || state.currentUser.role!=="admin"){ switchMainTab("home"); return; }
     $("#adminSection").classList.remove("hidden");
@@ -1206,12 +1215,22 @@ $all(".nav-tab[data-tab]").forEach(t=>t.addEventListener("click",()=>switchMainT
 function fmtDateTime(d){
   return new Date(d).toLocaleString("th-TH",{day:"2-digit",month:"short",year:"2-digit",hour:"2-digit",minute:"2-digit"});
 }
+function renderBookingsList(bookings){
+  const items = (bookings||[]).slice(0,30);
+  return '<div class="section-mini">📅 รายการจอง ('+(bookings?bookings.length:0)+')</div>'+
+    (items.length ? items.map(b=>
+      '<div class="match-item"><div style="font-size:22px;">📅</div><div style="flex:1;">'+
+        '<b>'+b.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+
+        String(b.date).slice(0,10)+' เวลา '+b.time+' น. · '+b.pax+' ท่าน · รหัส '+b.ref+
+      '</div></div></div>'
+    ).join("")
+      : '<div class="hint-box">ยังไม่มีรายการจอง ลองกด "จองผ่านแอป" ที่หน้ารายละเอียดร้านดูก่อน</div>');
+}
 function buildActivityHtml(u, data){
   const favs = data.favorites || [];
   const hist = (data.spinHistory||[]).slice(0,30);
   const visits = (data.visitLog||[]).slice(0,20);
   const respins = (data.respinLog||[]).slice(0,20);
-  const bookings = (data.bookings||[]).slice(0,20);
   const contactBits = [u.phone,u.email,u.age?u.age+" ปี":""].filter(Boolean).join(" · ");
   return (
     '<div class="profile-head">'+
@@ -1223,14 +1242,6 @@ function buildActivityHtml(u, data){
     '<div class="section-mini">❤️ ร้านโปรด ('+favs.length+')</div>'+
     (favs.length ? favs.map(r=>'<div class="match-item"><div style="font-size:22px;">'+TYPE_EMOJI[r.type]+'</div><div style="flex:1;"><b>'+r.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+r.type+' · ชั้น '+r.floor+'</div></div><button class="mini-btn danger" data-unfav="'+r.id+'">ลบ</button></div>').join("")
       : '<div class="hint-box">ยังไม่มีร้านโปรด กดหัวใจที่การ์ดร้านเพื่อบันทึก</div>')+
-    '<div class="section-mini">📅 รายการจองของฉัน ('+(data.bookings?data.bookings.length:0)+')</div>'+
-    (bookings.length ? bookings.map(b=>
-      '<div class="match-item"><div style="font-size:22px;">📅</div><div style="flex:1;">'+
-        '<b>'+b.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+
-        String(b.date).slice(0,10)+' เวลา '+b.time+' น. · '+b.pax+' ท่าน · รหัส '+b.ref+
-      '</div></div></div>'
-    ).join("")
-      : '<div class="hint-box">ยังไม่มีรายการจอง ลองกด "จองผ่านแอป" ที่หน้ารายละเอียดร้านดูก่อน</div>')+
     '<div class="section-mini">🎡 ประวัติการสุ่ม ('+(data.spinHistory?data.spinHistory.length:0)+' ครั้ง)</div>'+
     (hist.length ? hist.map(h=>'<div class="log-item">🎯 สุ่มได้ <b style="color:var(--text);">'+h.name+'</b> — '+fmtDateTime(h.time)+'</div>').join("")
       : '<div class="hint-box">ยังไม่มีประวัติการสุ่ม</div>')+
@@ -1269,6 +1280,28 @@ async function openProfile(){
   });
   box.querySelector("#profileFeedbackBtn").addEventListener("click",()=>{ openModal("feedbackOverlay"); });
   box.querySelector("#logoutBtn").addEventListener("click",()=>{ logout(); closeModal("detailOverlay"); });
+}
+async function openMyBookings(){
+  if(!state.currentUser){
+    openModal("loginOverlay");
+    switchMainTab("home");
+    return;
+  }
+  const box = $("#detailModalBox");
+  box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">กำลังโหลดข้อมูล...</div>';
+  openModal("detailOverlay");
+  let data;
+  try{
+    data = await apiFetch("/api/users/"+encodeURIComponent(state.currentUser.username)+"/activity",{headers:authHeaders()});
+  }catch(err){
+    box.innerHTML = '<button class="modal-close" data-close="detailOverlay">✕</button><div class="hint-box">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</div>';
+    return;
+  }
+  box.innerHTML =
+    '<button class="modal-close" data-close="detailOverlay">✕</button>'+
+    '<div class="modal-title">📅 รายการจองของฉัน</div>'+
+    '<div class="modal-sub">ประวัติการจองโต๊ะทั้งหมดของคุณ</div>'+
+    renderBookingsList(data.bookings);
 }
 
 /* ================= AUTH ================= */
@@ -1517,7 +1550,8 @@ async function openCustomerDetail(username){
   }
   box.innerHTML =
     '<button class="modal-close" data-close="detailOverlay">✕</button>'+
-    buildActivityHtml(data.user, data);
+    buildActivityHtml(data.user, data)+
+    renderBookingsList(data.bookings);
 }
 
 /* ================= ADMIN: FEEDBACK ================= */
