@@ -1209,8 +1209,19 @@ $("#searchInput").addEventListener("change", e=>{
   }
 });
 
+const LAST_LOCATION_KEY = "kinAraiDee_lastLocation";
+function saveLastLocation(tab, adminSubTab){
+  try{
+    const current = adminSubTab ? {tab, adminSubTab} : {tab};
+    localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(current));
+  }catch(e){}
+}
+function getLastLocation(){
+  try{ return JSON.parse(localStorage.getItem(LAST_LOCATION_KEY)); }catch(e){ return null; }
+}
 function switchMainTab(tab){
   state.tab = tab;
+  saveLastLocation(tab);
   $all(".nav-tab[data-tab]").forEach(t=>t.classList.toggle("active", t.dataset.tab===tab));
   $("#wheelSection").classList.add("hidden");
   $("#gridSection").classList.add("hidden");
@@ -1560,19 +1571,20 @@ $("#assistantFab").addEventListener("click",()=>{
 });
 
 /* ================= ADMIN: DATA MANAGEMENT ================= */
+function switchAdminSubTab(tab){
+  $all("#adminInnerTabs .nav-tab").forEach(x=>x.classList.toggle("active", x.dataset.atab===tab));
+  $("#adminDataPanel").classList.toggle("hidden", tab!=="data");
+  $("#adminCustomersPanel").classList.toggle("hidden", tab!=="customers");
+  $("#adminFeedbackPanel").classList.toggle("hidden", tab!=="feedback");
+  $("#adminAnalyticsPanel").classList.toggle("hidden", tab!=="analytics");
+  saveLastLocation("admin", tab);
+  if(tab==="analytics") renderAnalytics();
+  if(tab==="customers") renderCustomerTable();
+  if(tab==="feedback") renderFeedbackList();
+  if(tab==="data"){ fetchRestaurants().then(renderAdminTable).catch(()=>{}); }
+}
 $all("#adminInnerTabs .nav-tab").forEach(t=>{
-  t.addEventListener("click",()=>{
-    $all("#adminInnerTabs .nav-tab").forEach(x=>x.classList.remove("active"));
-    t.classList.add("active");
-    const tab = t.dataset.atab;
-    $("#adminDataPanel").classList.toggle("hidden", tab!=="data");
-    $("#adminCustomersPanel").classList.toggle("hidden", tab!=="customers");
-    $("#adminFeedbackPanel").classList.toggle("hidden", tab!=="feedback");
-    $("#adminAnalyticsPanel").classList.toggle("hidden", tab!=="analytics");
-    if(tab==="analytics") renderAnalytics();
-    if(tab==="customers") renderCustomerTable();
-    if(tab==="feedback") renderFeedbackList();
-  });
+  t.addEventListener("click",()=>switchAdminSubTab(t.dataset.atab));
 });
 /* ================= ADMIN: CUSTOMERS ================= */
 async function renderCustomerTable(){
@@ -1903,12 +1915,20 @@ async function refreshActiveUsers(){
     $("#statActiveUsers").textContent = r.activeNow;
   }catch(e){}
 }
-function startActiveUsersPolling(){
+// Keeps whichever admin sub-panel is currently open live, without a manual refresh.
+// Cheap to run always: the two guards below make it a no-op unless an admin is
+// actually looking at the dashboard right now.
+function startAdminPolling(){
   setInterval(()=>{
     if(!(state.currentUser && state.currentUser.role==="admin")) return;
-    if($("#adminAnalyticsPanel").classList.contains("hidden")) return;
-    refreshActiveUsers();
-  }, 12000);
+    if($("#adminSection").classList.contains("hidden")) return;
+    const activeBtn = document.querySelector("#adminInnerTabs .nav-tab.active");
+    const tab = activeBtn ? activeBtn.dataset.atab : "data";
+    if(tab==="analytics") renderAnalytics();
+    else if(tab==="customers") renderCustomerTable();
+    else if(tab==="feedback") renderFeedbackList();
+    else if(tab==="data") fetchRestaurants().then(renderAdminTable).catch(()=>{});
+  }, 10000);
 }
 async function restoreSession(){
   let token;
@@ -1931,7 +1951,7 @@ async function init(){
   renderAuthArea();
   buildWizardOptions();
   startHeartbeat();
-  startActiveUsersPolling();
+  startAdminPolling();
   try{
     await fetchRestaurants();
     onFiltersChanged();
@@ -1939,6 +1959,18 @@ async function init(){
     showToast("⚠️ เชื่อมต่อฐานข้อมูลไม่สำเร็จ: "+err.message);
     onFiltersChanged();
   }
+  restoreLastLocation();
+}
+function restoreLastLocation(){
+  const loc = getLastLocation();
+  if(!loc || !loc.tab || loc.tab==="home") return;
+  if(loc.tab==="admin"){
+    if(!(state.currentUser && state.currentUser.role==="admin")) return;
+    switchMainTab("admin");
+    if(loc.adminSubTab) switchAdminSubTab(loc.adminSubTab);
+    return;
+  }
+  if(["list","bookings","profile"].includes(loc.tab)) switchMainTab(loc.tab);
 }
 init();
 
