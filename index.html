@@ -294,6 +294,16 @@ a{color:inherit;text-decoration:none;}
 .checkbox-row{display:flex;gap:14px;flex-wrap:wrap;}
 .checkbox-item{display:flex;align-items:center;gap:6px;font-size:13px;}
 
+/* pdpa consent */
+.consent-box{border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-top:8px;background:var(--bg-alt);}
+.consent-notice{max-height:150px;overflow-y:auto;font-size:11.5px;line-height:1.6;color:var(--text-soft);padding-right:6px;}
+.consent-notice b{color:var(--text);}
+.consent-notice ul{margin:4px 0 8px 16px;}
+.consent-notice li{margin-bottom:3px;}
+.consent-check{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.45;margin-top:10px;cursor:pointer;}
+.consent-check input{margin-top:2px;flex-shrink:0;width:16px;height:16px;accent-color:var(--primary);}
+.consent-required{color:var(--danger);font-weight:700;}
+
 /* profile */
 .profile-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
 .profile-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#8FD9AE);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;}
@@ -419,7 +429,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
       <div class="hint" id="customerCount" style="margin-bottom:10px;">ทั้งหมด 0 คน</div>
       <div class="table-scroll">
         <table class="admin-table">
-          <thead><tr><th>ชื่อ-นามสกุล</th><th>Username</th><th>เบอร์โทร</th><th>อีเมล</th><th>อายุ</th><th>วันเกิด</th><th>สิทธิ์</th><th>โปรด</th><th>สุ่มแล้ว</th><th></th></tr></thead>
+          <thead><tr><th>ชื่อ-นามสกุล</th><th>Username</th><th>เบอร์โทร</th><th>อีเมล</th><th>อายุ</th><th>วันเกิด</th><th>PDPA</th><th>รับข่าวสาร</th><th>สิทธิ์</th><th>โปรด</th><th>สุ่มแล้ว</th><th></th></tr></thead>
           <tbody id="customerTableBody"></tbody>
         </table>
       </div>
@@ -598,6 +608,41 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
         <label class="form-label">รหัสผ่าน</label>
         <input class="form-input" id="regPassword" type="password" placeholder="ตั้งรหัสผ่าน">
       </div>
+
+      <div class="form-group">
+        <label class="form-label">🔐 ความยินยอมในการเก็บข้อมูลส่วนบุคคล (PDPA)</label>
+        <div class="consent-box">
+          <div class="consent-notice">
+            <b>ผู้ควบคุมข้อมูล:</b> ทีมงานแอป "กินอะไรดี? @ Future Park รังสิต"<br><br>
+            <b>ข้อมูลที่เราเก็บ:</b>
+            <ul>
+              <li>ชื่อ-นามสกุล, เบอร์โทรศัพท์, อีเมล, อายุ, วันเดือนปีเกิด</li>
+              <li>ชื่อผู้ใช้และรหัสผ่าน (รหัสผ่านถูกเข้ารหัสไว้ ทีมงานไม่สามารถอ่านได้)</li>
+              <li>ประวัติการใช้งาน เช่น การสุ่มร้าน ร้านโปรด การค้นหา การจองโต๊ะ และรีวิว</li>
+            </ul>
+            <b>วัตถุประสงค์:</b>
+            <ul>
+              <li>สร้างและยืนยันตัวตนบัญชีผู้ใช้ของคุณ</li>
+              <li>ยืนยันตัวตนด้วยวันเดือนปีเกิด กรณีขอรีเซ็ตรหัสผ่าน</li>
+              <li>บันทึกร้านโปรด ประวัติการสุ่ม และรายการจองของคุณ</li>
+              <li>ใช้ข้อมูลสถิติภาพรวมเพื่อปรับปรุงบริการ</li>
+            </ul>
+            <b>ระยะเวลาเก็บ:</b> เก็บไว้ตลอดระยะเวลาที่คุณยังเป็นสมาชิก และจะลบเมื่อคุณขอยกเลิกบัญชี<br><br>
+            <b>การเปิดเผยข้อมูล:</b> ข้อมูลส่วนบุคคลของคุณจะเห็นได้เฉพาะตัวคุณเองและผู้ดูแลระบบเท่านั้น เราไม่ขายหรือส่งต่อข้อมูลให้บุคคลที่สามเพื่อการตลาด<br><br>
+            <b>สิทธิของคุณตาม PDPA:</b> คุณมีสิทธิขอเข้าถึง ขอสำเนา ขอแก้ไข ขอลบ ขอระงับการใช้ ขอคัดค้านการประมวลผล และถอนความยินยอมได้ตลอดเวลา โดยติดต่อทีมงานผ่านเมนู "ส่งความคิดเห็นถึงทีมงาน" ในหน้าโปรไฟล์
+          </div>
+
+          <label class="consent-check">
+            <input type="checkbox" id="regConsentRequired">
+            <span>ข้าพเจ้าได้อ่านและ<b>ยินยอม</b>ให้เก็บรวบรวม ใช้ และประมวลผลข้อมูลส่วนบุคคลตามวัตถุประสงค์ข้างต้น <span class="consent-required">(จำเป็น)</span></span>
+          </label>
+          <label class="consent-check">
+            <input type="checkbox" id="regConsentMarketing">
+            <span>ข้าพเจ้ายินยอมรับข่าวสาร โปรโมชั่น และร้านอาหารแนะนำ <span style="color:var(--text-soft);">(ไม่บังคับ — ไม่ติ๊กก็สมัครได้)</span></span>
+          </label>
+        </div>
+      </div>
+
       <div class="err-msg" id="registerError">กรุณากรอกข้อมูลให้ครบถ้วน</div>
       <button class="btn btn-primary btn-block" id="registerSubmitBtn">✅ สมัครสมาชิก</button>
     </div>
@@ -1369,6 +1414,9 @@ function buildActivityHtml(u, data){
       '<div class="modal-sub" style="margin-bottom:0;">'+(u.role==="admin"?"ผู้ดูแลระบบ":"สมาชิก")+(contactBits?" · "+contactBits:"")+
         (u.registeredAt?' · สมัครเมื่อ '+fmtDateTime(u.registeredAt):"")+'</div></div>'+
     '</div>'+
+    '<div class="hint-box">🔐 PDPA: '+
+      (u.consentPdpaAt ? 'ยินยอมเมื่อ '+fmtDateTime(u.consentPdpaAt) : 'ไม่มีบันทึกความยินยอม (สมัครก่อนมีระบบ PDPA)')+
+      ' · รับข่าวสาร: '+(u.consentMarketing ? 'ยินยอม' : 'ไม่ยินยอม')+'</div>'+
     '<div class="section-mini">❤️ ร้านโปรด ('+favs.length+')</div>'+
     (favs.length ? favs.map(r=>'<div class="match-item"><div style="font-size:22px;">'+TYPE_EMOJI[r.type]+'</div><div style="flex:1;"><b>'+r.name+'</b><div style="font-size:11.5px;color:var(--text-soft);">'+r.type+' · ชั้น '+r.floor+'</div></div><button class="mini-btn danger" data-unfav="'+r.id+'">ลบ</button></div>').join("")
       : '<div class="hint-box">ยังไม่มีร้านโปรด กดหัวใจที่การ์ดร้านเพื่อบันทึก</div>')+
@@ -1510,12 +1558,22 @@ async function registerUser(){
   const birthdate = $("#regBirthdate").value;
   const username = $("#regUsername").value.trim();
   const password = $("#regPassword").value.trim();
+  const consentPdpa = $("#regConsentRequired").checked;
+  const consentMarketing = $("#regConsentMarketing").checked;
+
+  if(!consentPdpa){
+    $("#registerError").textContent = "กรุณายินยอมให้เก็บข้อมูลส่วนบุคคล (PDPA) เพื่อสมัครสมาชิก";
+    $("#registerError").style.display="block";
+    return;
+  }
 
   try{
     await apiFetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({firstName,lastName,phone,email,age,birthdate,username,password})});
+      body:JSON.stringify({firstName,lastName,phone,email,age,birthdate,username,password,consentPdpa,consentMarketing})});
     $("#registerError").style.display="none";
     ["regFirstName","regLastName","regPhone","regEmail","regAge","regBirthdate","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
+    $("#regConsentRequired").checked = false;
+    $("#regConsentMarketing").checked = false;
     showToast("🎉 สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");
     await login(username, password);
     switchAuthTab("login");
@@ -1703,25 +1761,27 @@ $all("#adminInnerTabs .nav-tab").forEach(t=>{
 /* ================= ADMIN: CUSTOMERS ================= */
 async function renderCustomerTable(){
   const tbody = $("#customerTableBody");
-  tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-soft);">กำลังโหลด...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="12" style="color:var(--text-soft);">กำลังโหลด...</td></tr>';
   let users;
   try{
     users = await apiFetch("/api/users",{headers:authHeaders()});
   }catch(err){
-    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-soft);">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="color:var(--text-soft);">โหลดข้อมูลไม่สำเร็จ: '+err.message+'</td></tr>';
     $("#customerCount").textContent = "ทั้งหมด 0 คน";
     return;
   }
   $("#customerCount").textContent = "ทั้งหมด "+users.length+" คน";
   tbody.innerHTML = "";
   if(!users.length){
-    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-soft);">ยังไม่มีลูกค้าสมัครสมาชิก</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="color:var(--text-soft);">ยังไม่มีลูกค้าสมัครสมาชิก</td></tr>';
     return;
   }
   users.forEach(u=>{
     const tr = el("tr");
     tr.innerHTML = '<td>'+(u.name||"-")+'</td><td>'+u.username+'</td><td>'+(u.phone||"-")+'</td><td>'+(u.email||"-")+'</td><td>'+(u.age||"-")+'</td>'+
       '<td>'+(u.birthdate?String(u.birthdate).slice(0,10):"-")+'</td>'+
+      '<td>'+(u.consentPdpaAt?'✅ '+String(u.consentPdpaAt).slice(0,10):"-")+'</td>'+
+      '<td>'+(u.consentMarketing?"✅":"—")+'</td>'+
       '<td>'+(u.role==="admin"?'<span class="badge-role">ADMIN</span>':'สมาชิก')+'</td>'+
       '<td>'+u.favCount+'</td><td>'+u.spinCount+'</td>'+
       '<td><button class="mini-btn edit" data-cust="'+u.username+'">ดูรายละเอียด</button></td>';

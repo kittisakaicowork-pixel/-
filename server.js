@@ -126,9 +126,13 @@ async function initDb() {
       email TEXT,
       age TEXT,
       birthdate DATE,
+      consent_pdpa_at TIMESTAMPTZ,
+      consent_marketing BOOLEAN NOT NULL DEFAULT FALSE,
       registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate DATE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_pdpa_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_marketing BOOLEAN NOT NULL DEFAULT FALSE;
     CREATE TABLE IF NOT EXISTS favorites (
       username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
       restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
@@ -255,6 +259,8 @@ function mapUserPublic(row) {
     firstName: row.first_name || "", lastName: row.last_name || "",
     phone: row.phone || "", email: row.email || "", age: row.age || "",
     birthdate: row.birthdate || null,
+    consentPdpaAt: row.consent_pdpa_at || null,
+    consentMarketing: row.consent_marketing === true,
     registeredAt: row.registered_at
   };
 }
@@ -349,21 +355,26 @@ app.post("/api/admin/reseed", requireAdmin, async (req, res) => {
 /* ================= AUTH ================= */
 app.post("/api/register", async (req, res) => {
   try {
-    const { firstName, lastName, phone, email, age, birthdate, username, password } = req.body;
+    const { firstName, lastName, phone, email, age, birthdate, username, password, consentPdpa, consentMarketing } = req.body;
     if (!firstName || !lastName || !phone || !email || !age || !birthdate || !username || !password) {
       return res.status(400).json({ error: "กรุณากรอกข้อมูลให้ครบถ้วน" });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: "รูปแบบอีเมลไม่ถูกต้อง" });
     }
+    // PDPA requires explicit consent before any personal data is stored — enforced here too,
+    // not just in the UI, so the record can't be created without it.
+    if (consentPdpa !== true) {
+      return res.status(400).json({ error: "กรุณายินยอมให้เก็บข้อมูลส่วนบุคคล (PDPA) เพื่อสมัครสมาชิก" });
+    }
     const { rows: existing } = await pool.query("SELECT username FROM users WHERE username=$1", [username]);
     if (existing.length) return res.status(409).json({ error: "ชื่อผู้ใช้นี้ถูกใช้แล้ว กรุณาเลือกชื่ออื่น" });
 
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
-      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age,birthdate)
-       VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, age, birthdate]
+      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age,birthdate,consent_pdpa_at,consent_marketing)
+       VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8,$9,now(),$10) RETURNING *`,
+      [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, age, birthdate, consentMarketing === true]
     );
     const token = issueToken(rows[0].username, rows[0].role);
     res.json(Object.assign(mapUserPublic(rows[0]), { token }));
