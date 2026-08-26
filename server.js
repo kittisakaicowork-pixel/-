@@ -3,6 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
+const ExcelJS = require("exceljs");
 
 const app = express();
 app.use(express.json());
@@ -658,6 +659,253 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       }
     });
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดสถิติไม่สำเร็จ" }); }
+});
+
+/* ================= ADMIN: EXPORT TO EXCEL ================= */
+// Admin-only: this workbook contains every customer's personal data, so it must never
+// be reachable without an admin token (browsers can't set headers on a plain link/window.open,
+// so the frontend fetches it with the auth header and saves the blob instead).
+app.get("/api/export/excel", requireAdmin, async (req, res) => {
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "กินอะไรดี? @ Future Park รังสิต";
+    wb.created = new Date();
+
+    const DATETIME_FMT = "yyyy-mm-dd hh:mm";
+    function newSheet(name) {
+      return wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 1 }] });
+    }
+    function fillSheet(ws, columns, rows) {
+      ws.columns = columns;
+      const header = ws.getRow(1);
+      header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4C9A6A" } };
+      header.alignment = { vertical: "middle" };
+      header.height = 20;
+      rows.forEach(r => ws.addRow(r));
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
+      return ws;
+    }
+    const addSheet = (name, columns, rows) => fillSheet(newSheet(name), columns, rows);
+    const joinList = v => Array.isArray(v) ? v.join(", ") : (v || "");
+
+    // Created up front so it lands as the first tab; its rows need counts from every
+    // query below, so it gets populated at the end.
+    const summarySheet = newSheet("สรุปภาพรวม");
+
+    /* --- ร้านอาหาร --- */
+    const { rows: restaurants } = await pool.query("SELECT * FROM restaurants ORDER BY id ASC");
+    addSheet("ร้านอาหาร", [
+      { header: "ID", key: "id", width: 6 },
+      { header: "ชื่อร้าน", key: "name", width: 30 },
+      { header: "ประเภท", key: "type", width: 22 },
+      { header: "ชั้น", key: "floor", width: 8 },
+      { header: "โซน", key: "zone", width: 28 },
+      { header: "ช่วงราคา", key: "price", width: 12 },
+      { header: "คะแนน", key: "rating", width: 9 },
+      { header: "เมนูแนะนำ", key: "recommended", width: 40 },
+      { header: "เวลาเปิด-ปิด", key: "hours", width: 16 },
+      { header: "แท็ก", key: "tags", width: 30 },
+      { header: "เบอร์ติดต่อ", key: "contact", width: 16 },
+      { header: "เดลิเวอรี่", key: "delivery", width: 24 },
+      { header: "รองรับจำนวนคน", key: "pax", width: 16 },
+      { header: "ร้านใหม่", key: "isNew", width: 10 }
+    ], restaurants.map(r => ({
+      id: r.id, name: r.name, type: r.type, floor: r.floor, zone: r.zone, price: r.price,
+      rating: parseFloat(r.rating), recommended: joinList(r.recommended), hours: r.hours,
+      tags: joinList(r.tags), contact: r.contact, delivery: joinList(r.delivery),
+      pax: joinList(r.pax), isNew: r.is_new ? "ใช่" : "ไม่"
+    })));
+
+    /* --- ลูกค้า --- */
+    const { rows: users } = await pool.query(`
+      SELECT u.*,
+        (SELECT COUNT(*) FROM favorites f WHERE f.username=u.username) AS fav_count,
+        (SELECT COUNT(*) FROM spin_history s WHERE s.username=u.username) AS spin_count,
+        (SELECT COUNT(*) FROM bookings b WHERE b.username=u.username) AS booking_count
+      FROM users u ORDER BY u.registered_at ASC
+    `);
+    const usersSheet = addSheet("ลูกค้า", [
+      { header: "ชื่อ-นามสกุล", key: "name", width: 26 },
+      { header: "Username", key: "username", width: 18 },
+      { header: "เบอร์โทร", key: "phone", width: 16 },
+      { header: "อีเมล", key: "email", width: 28 },
+      { header: "อายุ", key: "age", width: 8 },
+      { header: "วันเกิด", key: "birthdate", width: 14 },
+      { header: "สิทธิ์", key: "role", width: 10 },
+      { header: "ยินยอม PDPA เมื่อ", key: "consentPdpaAt", width: 20 },
+      { header: "รับข่าวสาร", key: "consentMarketing", width: 12 },
+      { header: "ร้านโปรด", key: "favCount", width: 10 },
+      { header: "สุ่มแล้ว", key: "spinCount", width: 10 },
+      { header: "จองแล้ว", key: "bookingCount", width: 10 },
+      { header: "สมัครเมื่อ", key: "registeredAt", width: 20 }
+    ], users.map(u => ({
+      name: u.name, username: u.username, phone: u.phone || "", email: u.email || "",
+      age: u.age || "", birthdate: u.birthdate ? String(u.birthdate).slice(0, 10) : "",
+      role: u.role === "admin" ? "ผู้ดูแลระบบ" : "สมาชิก",
+      consentPdpaAt: u.consent_pdpa_at || null,
+      consentMarketing: u.consent_marketing ? "ยินยอม" : "ไม่ยินยอม",
+      favCount: parseInt(u.fav_count, 10), spinCount: parseInt(u.spin_count, 10),
+      bookingCount: parseInt(u.booking_count, 10),
+      registeredAt: u.registered_at
+    })));
+    usersSheet.getColumn("consentPdpaAt").numFmt = DATETIME_FMT;
+    usersSheet.getColumn("registeredAt").numFmt = DATETIME_FMT;
+
+    /* --- รายการจอง --- */
+    const { rows: bookings } = await pool.query("SELECT * FROM bookings ORDER BY created_at DESC");
+    const bookingSheet = addSheet("รายการจอง", [
+      { header: "รหัสอ้างอิง", key: "ref", width: 14 },
+      { header: "ร้าน", key: "restaurantName", width: 30 },
+      { header: "วันที่จอง", key: "date", width: 14 },
+      { header: "เวลา", key: "time", width: 10 },
+      { header: "จำนวน (ท่าน)", key: "pax", width: 14 },
+      { header: "ชื่อผู้จอง", key: "bookerName", width: 24 },
+      { header: "เบอร์ติดต่อ", key: "bookerPhone", width: 16 },
+      { header: "บัญชีผู้ใช้", key: "username", width: 18 },
+      { header: "จองเมื่อ", key: "createdAt", width: 20 }
+    ], bookings.map(b => ({
+      ref: b.reference_code, restaurantName: b.restaurant_name,
+      date: b.booking_date ? String(b.booking_date).slice(0, 10) : "",
+      time: b.booking_time, pax: b.pax, bookerName: b.booker_name, bookerPhone: b.booker_phone,
+      username: b.username || "(ไม่ได้ล็อกอิน)", createdAt: b.created_at
+    })));
+    bookingSheet.getColumn("createdAt").numFmt = DATETIME_FMT;
+
+    /* --- ความคิดเห็น --- */
+    const FEEDBACK_LABEL = { good: "👍 สิ่งที่ชอบ", bad: "👎 สิ่งที่ไม่ชอบ", improvement: "💡 ควรปรับปรุง" };
+    const { rows: feedback } = await pool.query(`
+      SELECT f.*, u.name AS user_name FROM feedback f
+      LEFT JOIN users u ON u.username = f.username ORDER BY f.created_at DESC
+    `);
+    const feedbackSheet = addSheet("ความคิดเห็น", [
+      { header: "ประเภท", key: "type", width: 18 },
+      { header: "ชื่อผู้ส่ง", key: "name", width: 24 },
+      { header: "Username", key: "username", width: 18 },
+      { header: "ข้อความ", key: "message", width: 60 },
+      { header: "ส่งเมื่อ", key: "createdAt", width: 20 }
+    ], feedback.map(f => ({
+      type: FEEDBACK_LABEL[f.type] || f.type, name: f.user_name || f.username,
+      username: f.username, message: f.message, createdAt: f.created_at
+    })));
+    feedbackSheet.getColumn("message").alignment = { wrapText: true, vertical: "top" };
+    feedbackSheet.getColumn("createdAt").numFmt = DATETIME_FMT;
+
+    /* --- รีวิวร้าน --- */
+    const { rows: reviews } = await pool.query(`
+      SELECT rv.*, r.name AS restaurant_name, u.name AS user_name FROM reviews rv
+      LEFT JOIN restaurants r ON r.id = rv.restaurant_id
+      LEFT JOIN users u ON u.username = rv.username
+      ORDER BY rv.created_at DESC
+    `);
+    const reviewSheet = addSheet("รีวิวร้าน", [
+      { header: "ร้าน", key: "restaurantName", width: 30 },
+      { header: "คะแนน", key: "rating", width: 9 },
+      { header: "ความเห็น", key: "comment", width: 60 },
+      { header: "ชื่อผู้รีวิว", key: "name", width: 24 },
+      { header: "Username", key: "username", width: 18 },
+      { header: "รีวิวเมื่อ", key: "createdAt", width: 20 }
+    ], reviews.map(rv => ({
+      restaurantName: rv.restaurant_name || "(ร้านถูกลบแล้ว)", rating: rv.rating,
+      comment: rv.comment || "", name: rv.user_name || rv.username, username: rv.username,
+      createdAt: rv.created_at
+    })));
+    reviewSheet.getColumn("comment").alignment = { wrapText: true, vertical: "top" };
+    reviewSheet.getColumn("createdAt").numFmt = DATETIME_FMT;
+
+    /* --- ประวัติกิจกรรม --- */
+    const activityCols = extraHeader => [
+      { header: "ร้าน", key: "name", width: 30 },
+      ...(extraHeader ? [{ header: extraHeader, key: "extra", width: 26 }] : []),
+      { header: "บัญชีผู้ใช้", key: "username", width: 18 },
+      { header: "เมื่อ", key: "time", width: 20 }
+    ];
+    const { rows: spins } = await pool.query("SELECT * FROM spin_history ORDER BY spun_at DESC");
+    addSheet("ประวัติการสุ่ม", activityCols(), spins.map(s => ({
+      name: s.restaurant_name, username: s.username || "(ไม่ได้ล็อกอิน)", time: s.spun_at
+    }))).getColumn("time").numFmt = DATETIME_FMT;
+
+    const { rows: visits } = await pool.query("SELECT * FROM visit_log ORDER BY visited_at DESC");
+    addSheet("ใช้บริการจริง", activityCols("การกระทำ"), visits.map(v => ({
+      name: v.restaurant_name, extra: v.action, username: v.username || "(ไม่ได้ล็อกอิน)", time: v.visited_at
+    }))).getColumn("time").numFmt = DATETIME_FMT;
+
+    const { rows: respins } = await pool.query("SELECT * FROM respin_log ORDER BY respun_at DESC");
+    addSheet("สุ่มใหม่ (ปฏิเสธผล)", activityCols(), respins.map(v => ({
+      name: v.restaurant_name, username: v.username || "(ไม่ได้ล็อกอิน)", time: v.respun_at
+    }))).getColumn("time").numFmt = DATETIME_FMT;
+
+    const { rows: searches } = await pool.query("SELECT * FROM search_log ORDER BY searched_at DESC");
+    addSheet("ประวัติการค้นหา", [
+      { header: "คำค้นหา", key: "term", width: 30 },
+      { header: "บัญชีผู้ใช้", key: "username", width: 18 },
+      { header: "ค้นหาเมื่อ", key: "time", width: 20 }
+    ], searches.map(s => ({
+      term: s.term, username: s.username || "(ไม่ได้ล็อกอิน)", time: s.searched_at
+    }))).getColumn("time").numFmt = DATETIME_FMT;
+
+    /* --- สรุปภาพรวม --- */
+    const { rows: funnelRows } = await pool.query(`
+      WITH activity_visitor_ids AS (
+        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL
+        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL
+        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL
+      ),
+      guest_activity_visitor_ids AS (
+        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL AND username IS NULL
+        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL AND username IS NULL
+        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL AND username IS NULL
+      )
+      SELECT
+        (SELECT COUNT(*) FROM visitors) AS total_visitors,
+        (SELECT COUNT(*) FROM activity_visitor_ids) AS used_service_visitors,
+        (SELECT COUNT(*) FROM guest_activity_visitor_ids) AS guest_used_service_visitors
+    `);
+    const f = funnelRows[0];
+    const totalVisitors = parseInt(f.total_visitors, 10);
+    const usedService = parseInt(f.used_service_visitors, 10);
+    const { rows: favTotal } = await pool.query("SELECT COUNT(*) FROM favorites");
+    const summary = [
+      ["วันที่ออกรายงาน", new Date().toLocaleString("th-TH")],
+      ["", ""],
+      ["จำนวนร้านอาหารทั้งหมด", restaurants.length],
+      ["บัญชีลูกค้าที่สมัครแล้ว", users.length],
+      ["ยอดถูกใจรวม", parseInt(favTotal[0].count, 10)],
+      ["", ""],
+      ["เข้ามาเยี่ยมชมทั้งหมด (visitor)", totalVisitors],
+      ["เข้ามาแต่ไม่ได้ใช้บริการ", Math.max(0, totalVisitors - usedService)],
+      ["ใช้บริการแต่ไม่ได้ลงทะเบียน", parseInt(f.guest_used_service_visitors, 10)],
+      ["", ""],
+      ["จำนวนครั้งที่หมุนวงล้อ", spins.length],
+      ["ใช้บริการจริง (ครั้ง)", visits.length],
+      ["สุ่มใหม่ / ปฏิเสธผล (ครั้ง)", respins.length],
+      ["จำนวนครั้งที่ค้นหา", searches.length],
+      ["", ""],
+      ["รายการจองทั้งหมด", bookings.length],
+      ["รีวิวทั้งหมด", reviews.length],
+      ["ความคิดเห็นทั้งหมด", feedback.length],
+      ["  - 👍 สิ่งที่ชอบ", feedback.filter(x => x.type === "good").length],
+      ["  - 👎 สิ่งที่ไม่ชอบ", feedback.filter(x => x.type === "bad").length],
+      ["  - 💡 ควรปรับปรุง", feedback.filter(x => x.type === "improvement").length]
+    ];
+    fillSheet(summarySheet, [
+      { header: "รายการ", key: "label", width: 36 },
+      { header: "ค่า", key: "value", width: 24 }
+    ], summary.map(([label, value]) => ({ label, value })));
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = "kin-arai-dee-export-" + stamp + ".xlsx";
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", 'attachment; filename="' + filename + '"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error(e);
+    // Once wb.xlsx.write(res) has started streaming, the headers are already out —
+    // sending a JSON error at that point would throw ERR_HTTP_HEADERS_SENT.
+    if (res.headersSent) return res.end();
+    res.status(500).json({ error: "สร้างไฟล์ Excel ไม่สำเร็จ: " + e.message });
+  }
 });
 
 /* ================= STATIC FRONTEND ================= */

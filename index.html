@@ -407,6 +407,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
   <!-- ============ ADMIN VIEW ============ -->
   <section class="hidden" id="adminSection" style="margin-top:20px;">
     <div class="section-title">🛠️ Admin Dashboard</div>
+    <button class="btn btn-outline btn-block" id="exportExcelBtn" style="margin-bottom:12px;">📊 ดาวน์โหลดข้อมูลทั้งหมดเป็น Excel</button>
     <div class="admin-tabs" id="adminInnerTabs">
       <button class="nav-tab active" data-atab="data">📦 จัดการร้าน</button>
       <button class="nav-tab" data-atab="customers">👥 ลูกค้า</button>
@@ -1890,6 +1891,41 @@ $("#reseedBtn").addEventListener("click",async ()=>{
   }
   $("#reseedBtn").disabled = false;
   $("#reseedBtn").textContent = "🔄 เติมข้อมูลร้านตัวอย่าง (ถ้าข้อมูลหาย)";
+});
+
+/* ================= ADMIN: EXPORT TO EXCEL ================= */
+const EXPORT_BTN_LABEL = "📊 ดาวน์โหลดข้อมูลทั้งหมดเป็น Excel";
+$("#exportExcelBtn").addEventListener("click", async ()=>{
+  const btn = $("#exportExcelBtn");
+  btn.disabled = true;
+  btn.textContent = "⏳ กำลังสร้างไฟล์...";
+  let objectUrl = null;
+  try{
+    // Can't use a plain <a href> or window.open here — the endpoint is admin-only and the
+    // token has to travel in an Authorization header, so fetch the file then save the blob.
+    const res = await fetch("/api/export/excel", {headers: authHeaders()});
+    if(!res.ok){
+      let msg = "ดาวน์โหลดไม่สำเร็จ ("+res.status+")";
+      try{ const data = await res.json(); if(data && data.error) msg = data.error; }catch(e){}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const stamp = new Date().toISOString().slice(0,10);
+    objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = "kin-arai-dee-export-"+stamp+".xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast("✅ ดาวน์โหลดไฟล์ Excel เรียบร้อย");
+  }catch(err){
+    showToast("⚠️ "+err.message);
+  }finally{
+    if(objectUrl) setTimeout(()=>URL.revokeObjectURL(objectUrl), 10000);
+    btn.disabled = false;
+    btn.textContent = EXPORT_BTN_LABEL;
+  }
 });
 
 function openEditModal(id){
