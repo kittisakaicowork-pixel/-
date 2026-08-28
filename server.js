@@ -642,6 +642,65 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
     const fr = funnelRows[0];
     const totalVisitors = parseInt(fr.total_visitors, 10);
     const usedServiceVisitors = parseInt(fr.used_service_visitors, 10);
+
+    /* --- dashboard: 14-day daily series (generate_series so empty days still show as 0) --- */
+    const { rows: dailyRows } = await pool.query(`
+      SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
+        (SELECT COUNT(*) FROM spin_history s WHERE s.spun_at::date = d::date) AS spins,
+        (SELECT COUNT(*) FROM visit_log v WHERE v.visited_at::date = d::date) AS visits
+      FROM generate_series(CURRENT_DATE - INTERVAL '13 days', CURRENT_DATE, INTERVAL '1 day') d
+      ORDER BY d
+    `);
+
+    /* --- dashboard: breakdowns --- */
+    const { rows: byCategory } = await pool.query(`
+      SELECT r.type AS label, COUNT(*) AS count
+      FROM spin_history s JOIN restaurants r ON r.id = s.restaurant_id
+      GROUP BY r.type ORDER BY count DESC
+    `);
+    const { rows: byChannel } = await pool.query(`
+      SELECT action AS label, COUNT(*) AS count
+      FROM visit_log WHERE action IS NOT NULL
+      GROUP BY action ORDER BY count DESC
+    `);
+
+    /* --- dashboard: top restaurants (spins + real visits side by side) --- */
+    const { rows: topRestaurants } = await pool.query(`
+      SELECT r.id, r.name, r.type,
+        COUNT(s.id) AS spins,
+        (SELECT COUNT(*) FROM visit_log v WHERE v.restaurant_id = r.id) AS visits
+      FROM spin_history s JOIN restaurants r ON r.id = s.restaurant_id
+      GROUP BY r.id, r.name, r.type
+      ORDER BY spins DESC, r.name ASC
+      LIMIT 5
+    `);
+
+    /* --- dashboard: last 14 days vs the 14 before that, for the KPI deltas --- */
+    const { rows: deltaRows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM spin_history WHERE spun_at >= now() - interval '14 days') AS spins_cur,
+        (SELECT COUNT(*) FROM spin_history WHERE spun_at >= now() - interval '28 days' AND spun_at < now() - interval '14 days') AS spins_prev,
+        (SELECT COUNT(*) FROM visit_log WHERE visited_at >= now() - interval '14 days') AS visits_cur,
+        (SELECT COUNT(*) FROM visit_log WHERE visited_at >= now() - interval '28 days' AND visited_at < now() - interval '14 days') AS visits_prev,
+        (SELECT COUNT(*) FROM users WHERE registered_at >= now() - interval '14 days') AS users_cur,
+        (SELECT COUNT(*) FROM users WHERE registered_at >= now() - interval '28 days' AND registered_at < now() - interval '14 days') AS users_prev,
+        (SELECT COUNT(*) FROM search_log WHERE searched_at >= now() - interval '14 days') AS searches_cur,
+        (SELECT COUNT(*) FROM search_log WHERE searched_at >= now() - interval '28 days' AND searched_at < now() - interval '14 days') AS searches_prev,
+        (SELECT COUNT(*) FROM bookings WHERE created_at >= now() - interval '14 days') AS bookings_cur,
+        (SELECT COUNT(*) FROM bookings WHERE created_at >= now() - interval '28 days' AND created_at < now() - interval '14 days') AS bookings_prev
+    `);
+    const d = deltaRows[0];
+    // null (rather than 0%) when there's no prior period to compare against, so the UI
+    // can show "—" instead of a misleading +0%.
+    const pctChange = (cur, prev) => {
+      cur = parseInt(cur, 10); prev = parseInt(prev, 10);
+      if (!prev) return cur > 0 ? null : null;
+      return Math.round(((cur - prev) / prev) * 1000) / 10;
+    };
+
+    const { rows: bookingCountRows } = await pool.query("SELECT COUNT(*) FROM bookings");
+    const { rows: reviewStatRows } = await pool.query("SELECT COUNT(*) AS count, AVG(rating)::float AS avg FROM reviews");
+
     res.json({
       totalUsers: parseInt(userCountRows[0].count, 10),
       totalFavorites: parseInt(favCountRows[0].count, 10),
@@ -656,6 +715,25 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
         totalVisitors,
         visitedNoService: Math.max(0, totalVisitors - usedServiceVisitors),
         usedServiceNoAccount: parseInt(fr.guest_used_service_visitors, 10)
+      },
+      dashboard: {
+        daily: dailyRows.map(r => ({ day: r.day, spins: parseInt(r.spins, 10), visits: parseInt(r.visits, 10) })),
+        byCategory: byCategory.map(r => ({ label: r.label, count: parseInt(r.count, 10) })),
+        byChannel: byChannel.map(r => ({ label: r.label, count: parseInt(r.count, 10) })),
+        topRestaurants: topRestaurants.map(r => ({
+          id: r.id, name: r.name, type: r.type,
+          spins: parseInt(r.spins, 10), visits: parseInt(r.visits, 10)
+        })),
+        totalBookings: parseInt(bookingCountRows[0].count, 10),
+        totalReviews: parseInt(reviewStatRows[0].count, 10),
+        avgRating: reviewStatRows[0].avg ? Math.round(reviewStatRows[0].avg * 10) / 10 : null,
+        deltas: {
+          spins: pctChange(d.spins_cur, d.spins_prev),
+          visits: pctChange(d.visits_cur, d.visits_prev),
+          users: pctChange(d.users_cur, d.users_prev),
+          searches: pctChange(d.searches_cur, d.searches_prev),
+          bookings: pctChange(d.bookings_cur, d.bookings_prev)
+        }
       }
     });
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดสถิติไม่สำเร็จ" }); }

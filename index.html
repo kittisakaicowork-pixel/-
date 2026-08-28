@@ -328,6 +328,128 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
 }
 .fab-assistant:hover{transform:translateY(-3px) scale(1.03);}
 .hidden{display:none!important;}
+
+/* ============ ADMIN DASHBOARD ============ */
+:root{
+  --chart-1:#4C9A6A; --chart-2:#2FA8A0; --chart-3:#3B82C4;
+  --chart-4:#E0A03C; --chart-5:#C4658C; --chart-6:#7B68B5;
+}
+.dash-layout{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px;}
+/* Grid items default to min-width:auto, so a wide admin table inside one would push the
+   whole grid past the viewport instead of scrolling inside its own .table-scroll. */
+.dash-layout > *, .chart-row > *, .bottom-row > *, .kpi-grid > *{min-width:0;}
+@media(min-width:900px){ .dash-layout{grid-template-columns:196px 1fr;align-items:start;} }
+/* The rest of the app reads best at 900px, but the dashboard needs the room for
+   sidebar + 3-up charts — so widen the shell only while admin is open. */
+@media(min-width:1000px){ body.admin-wide .container{max-width:1280px;} }
+
+.dash-sidebar{display:none;}
+@media(min-width:900px){
+  .dash-sidebar{
+    display:block;background:var(--card-bg);border:1px solid var(--border);
+    border-radius:var(--radius);padding:12px;position:sticky;top:110px;box-shadow:var(--shadow);
+  }
+}
+.dash-brand{display:flex;align-items:center;gap:9px;padding:4px 6px 12px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+.dash-brand-mark{
+  width:34px;height:34px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--primary),#8FD9AE);
+  display:flex;align-items:center;justify-content:center;font-size:17px;
+}
+.dash-brand-name{font-size:13px;font-weight:800;line-height:1.2;}
+.dash-brand-sub{font-size:10px;color:var(--text-soft);}
+.dash-nav{display:flex;flex-direction:column;gap:3px;}
+.dash-nav-item{
+  display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:10px;
+  font-size:13px;font-weight:600;color:var(--text-soft);text-align:left;width:100%;
+  transition:background .15s,color .15s;
+}
+.dash-nav-item:hover{background:var(--bg-alt);color:var(--text);}
+.dash-nav-item.active{background:var(--primary);color:#fff;font-weight:700;}
+.dash-side-foot{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--text-soft);line-height:1.5;}
+
+.dash-header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;margin-bottom:14px;
+}
+.dash-title{font-size:19px;font-weight:800;line-height:1.25;}
+.dash-subtitle{font-size:12px;color:var(--text-soft);margin-top:3px;}
+.dash-header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.dash-chip{
+  display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--border);background:var(--card-bg);font-size:12px;
+  font-weight:600;color:var(--text-soft);white-space:nowrap;
+}
+
+/* KPI cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:14px;}
+/* the 5 headline KPIs sit on one row once there's room, like the reference layout */
+@media(min-width:1000px){ .kpi-grid--main{grid-template-columns:repeat(5,1fr);} }
+.kpi-card{display:flex;flex-direction:column;}
+.kpi-card .kpi-delta{margin-top:auto;padding-top:5px;}
+.kpi-card{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+  padding:12px;box-shadow:var(--shadow);
+}
+.kpi-icon{
+  width:30px;height:30px;border-radius:9px;background:var(--bg-alt);
+  display:flex;align-items:center;justify-content:center;font-size:15px;margin-bottom:8px;
+}
+.kpi-label{font-size:11px;color:var(--text-soft);font-weight:600;}
+.kpi-value{font-size:22px;font-weight:800;line-height:1.15;margin-top:3px;word-break:break-word;}
+.kpi-delta{font-size:10.5px;font-weight:700;margin-top:5px;display:flex;align-items:center;gap:3px;}
+.kpi-delta.up{color:var(--success);}
+.kpi-delta.down{color:var(--danger);}
+.kpi-delta.flat{color:var(--text-soft);}
+
+/* panels */
+.panel{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+  padding:14px;box-shadow:var(--shadow);
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.panel-title{font-size:13.5px;font-weight:800;}
+.panel-foot{
+  margin-top:12px;padding-top:10px;border-top:1px solid var(--border);
+  text-align:center;font-size:12px;font-weight:700;color:var(--primary);cursor:pointer;
+}
+.chart-row{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px;}
+@media(min-width:760px){ .chart-row{grid-template-columns:1.5fr 1fr 1fr;} }
+.bottom-row{display:grid;grid-template-columns:1fr;gap:12px;}
+@media(min-width:760px){ .bottom-row{grid-template-columns:1.6fr 1fr;} }
+
+/* charts */
+.line-chart{width:100%;height:auto;display:block;overflow:visible;}
+.donut-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;}
+.donut-legend{display:flex;flex-direction:column;gap:6px;min-width:96px;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-soft);}
+.legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.chart-empty{text-align:center;color:var(--text-soft);font-size:12px;padding:28px 8px;}
+
+/* ranked list */
+.rank-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.rank-row:last-child{border-bottom:none;}
+.rank-badge{
+  width:23px;height:23px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;background:var(--bg-alt);color:var(--text-soft);
+}
+.rank-badge.top{background:var(--primary);color:#fff;}
+.rank-emoji{font-size:20px;flex-shrink:0;}
+.rank-main{flex:1;min-width:0;}
+.rank-name{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-sub{font-size:10.5px;color:var(--text-soft);margin-top:1px;}
+.rank-bar-wrap{width:70px;flex-shrink:0;}
+.rank-bar-track{height:6px;border-radius:4px;background:var(--border);overflow:hidden;}
+.rank-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+.rank-pct{font-size:10.5px;font-weight:700;color:var(--text-soft);text-align:right;margin-top:3px;}
+
+/* insights */
+.insight-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.insight-item:last-child{border-bottom:none;}
+.insight-icon{font-size:17px;flex-shrink:0;line-height:1.3;}
+.insight-title{font-size:12.5px;font-weight:700;}
+.insight-desc{font-size:11.5px;color:var(--text-soft);line-height:1.5;margin-top:2px;}
 </style>
 </head>
 <body>
@@ -405,15 +527,48 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
   </section>
 
   <!-- ============ ADMIN VIEW ============ -->
-  <section class="hidden" id="adminSection" style="margin-top:20px;">
-    <div class="section-title">🛠️ Admin Dashboard</div>
-    <button class="btn btn-outline btn-block" id="exportExcelBtn" style="margin-bottom:12px;">📊 ดาวน์โหลดข้อมูลทั้งหมดเป็น Excel</button>
-    <div class="admin-tabs" id="adminInnerTabs">
-      <button class="nav-tab active" data-atab="data">📦 จัดการร้าน</button>
-      <button class="nav-tab" data-atab="customers">👥 ลูกค้า</button>
-      <button class="nav-tab" data-atab="feedback">💬 ความคิดเห็น</button>
-      <button class="nav-tab" data-atab="analytics">📊 สถิติ</button>
-    </div>
+  <section class="hidden" id="adminSection" style="margin-top:16px;">
+   <div class="dash-layout">
+
+    <!-- sidebar (desktop only; mobile keeps the horizontal tabs below) -->
+    <aside class="dash-sidebar">
+      <div class="dash-brand">
+        <div class="dash-brand-mark">🍽️</div>
+        <div>
+          <div class="dash-brand-name">กินอะไรดี?</div>
+          <div class="dash-brand-sub">Future Park Analytics</div>
+        </div>
+      </div>
+      <nav class="dash-nav" id="dashNav">
+        <button class="dash-nav-item" data-atab="analytics">📊 ภาพรวม</button>
+        <button class="dash-nav-item active" data-atab="data">📦 จัดการร้าน</button>
+        <button class="dash-nav-item" data-atab="customers">👥 ลูกค้า</button>
+        <button class="dash-nav-item" data-atab="feedback">💬 ความคิดเห็น</button>
+      </nav>
+      <div class="dash-side-foot">
+        <div id="dashSideUser">ผู้ดูแลระบบ</div>
+        <div id="dashSideUpdated">อัปเดตล่าสุด --:--</div>
+      </div>
+    </aside>
+
+    <div>
+      <div class="dash-header">
+        <div>
+          <div class="dash-title" id="dashHeaderTitle">🛠️ Admin Dashboard</div>
+          <div class="dash-subtitle" id="dashHeaderSub">ข้อมูลสรุปภาพรวมของแอปและการใช้งาน</div>
+        </div>
+        <div class="dash-header-actions">
+          <span class="dash-chip" id="dashLiveChip">🟢 กำลังใช้งาน <b id="dashLiveCount">--</b></span>
+          <button class="btn btn-outline" id="exportExcelBtn" style="flex:none;padding:8px 14px;">📊 ส่งออก Excel</button>
+        </div>
+      </div>
+
+      <div class="admin-tabs" id="adminInnerTabs">
+        <button class="nav-tab" data-atab="analytics">📊 ภาพรวม</button>
+        <button class="nav-tab active" data-atab="data">📦 จัดการร้าน</button>
+        <button class="nav-tab" data-atab="customers">👥 ลูกค้า</button>
+        <button class="nav-tab" data-atab="feedback">💬 ความคิดเห็น</button>
+      </div>
 
     <div id="adminDataPanel">
       <button class="btn btn-primary btn-block" id="addRestaurantBtn" style="margin-bottom:8px;">➕ เพิ่มร้านใหม่</button>
@@ -450,55 +605,135 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
     </div>
 
     <div class="hidden" id="adminAnalyticsPanel">
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-num" id="statActiveUsers">--</div><div class="stat-lbl">🟢 กำลังใช้งานอยู่ตอนนี้ (Real-time)</div></div>
-        <div class="stat-card"><div class="stat-num" id="statTotalSpins">--</div><div class="stat-lbl">จำนวนครั้งที่หมุนวงล้อ</div></div>
-        <div class="stat-card"><div class="stat-num" id="statTotalVisits">--</div><div class="stat-lbl">ใช้บริการจริง (ครั้ง / %)</div></div>
-        <div class="stat-card"><div class="stat-num" id="statTotalRespins">--</div><div class="stat-lbl">สุ่มใหม่ / ปฏิเสธผล (ครั้ง / %)</div></div>
-        <div class="stat-card"><div class="stat-num" id="statTotalUsers">--</div><div class="stat-lbl">บัญชีลูกค้าที่สมัครแล้ว</div></div>
-        <div class="stat-card"><div class="stat-num" id="statFavCount">--</div><div class="stat-lbl">ยอดถูกใจรวม</div></div>
-        <div class="stat-card"><div class="stat-num" id="statTotalSearches">--</div><div class="stat-lbl">จำนวนครั้งที่ค้นหา</div></div>
+
+      <!-- KPI row -->
+      <div class="kpi-grid kpi-grid--main">
+        <div class="kpi-card">
+          <div class="kpi-icon">🎡</div>
+          <div class="kpi-label">หมุนวงล้อทั้งหมด</div>
+          <div class="kpi-value" id="kpiSpins">--</div>
+          <div class="kpi-delta flat" id="kpiSpinsDelta">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">✅</div>
+          <div class="kpi-label">ใช้บริการจริง</div>
+          <div class="kpi-value" id="kpiVisits">--</div>
+          <div class="kpi-delta flat" id="kpiVisitsDelta">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">👥</div>
+          <div class="kpi-label">ลูกค้าที่สมัคร</div>
+          <div class="kpi-value" id="kpiUsers">--</div>
+          <div class="kpi-delta flat" id="kpiUsersDelta">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">📅</div>
+          <div class="kpi-label">รายการจอง</div>
+          <div class="kpi-value" id="kpiBookings">--</div>
+          <div class="kpi-delta flat" id="kpiBookingsDelta">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">⭐</div>
+          <div class="kpi-label">ร้านยอดนิยม</div>
+          <div class="kpi-value" id="kpiTopName" style="font-size:15px;">--</div>
+          <div class="kpi-delta flat" id="kpiTopSub">—</div>
+        </div>
       </div>
 
+      <!-- charts -->
+      <div class="chart-row">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">กิจกรรมรายวัน (14 วันล่าสุด)</div>
+            <select class="form-select" id="dashMetricSelect" style="width:auto;padding:6px 8px;font-size:12px;">
+              <option value="spins">การสุ่ม</option>
+              <option value="visits">ใช้บริการจริง</option>
+            </select>
+          </div>
+          <div id="dashLineChart"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">สัดส่วนการสุ่มตามหมวดหมู่</div></div>
+          <div id="dashCategoryDonut"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">ช่องทางการใช้บริการ</div></div>
+          <div id="dashChannelDonut"></div>
+        </div>
+      </div>
+
+      <!-- ranked list + insights -->
+      <div class="bottom-row">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">อันดับร้านยอดนิยม</div></div>
+          <div id="dashTopRestaurants"></div>
+          <div class="panel-foot" id="dashSeeAllRestaurants">ดูร้านทั้งหมด ›</div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">ข้อมูลเชิงลึก</div></div>
+          <div id="dashInsights"></div>
+        </div>
+      </div>
+
+      <!-- detailed breakdowns -->
       <div class="section-mini">📊 ภาพรวมผู้เข้าใช้งาน</div>
       <div class="hint" style="margin-bottom:8px;">นับจากอุปกรณ์/เบราว์เซอร์ที่เคยเข้าเว็บ (visitor) เทียบกับการใช้บริการจริงและการสมัครสมาชิก</div>
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-num" id="statTotalVisitors">--</div><div class="stat-lbl">👀 เข้ามาเยี่ยมชมทั้งหมด</div></div>
-        <div class="stat-card"><div class="stat-num" id="statVisitedNoService">--</div><div class="stat-lbl">😴 เข้ามาแต่ไม่ได้ใช้บริการ</div></div>
-        <div class="stat-card"><div class="stat-num" id="statUsedNoAccount">--</div><div class="stat-lbl">🎯 ใช้บริการแต่ไม่ได้ลงทะเบียน</div></div>
-        <div class="stat-card"><div class="stat-num" id="statRegistered">--</div><div class="stat-lbl">✅ เข้ามาและลงทะเบียนแล้ว</div></div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">👀 เข้ามาเยี่ยมชมทั้งหมด</div><div class="kpi-value" id="statTotalVisitors">--</div></div>
+        <div class="kpi-card"><div class="kpi-label">😴 เข้ามาแต่ไม่ได้ใช้บริการ</div><div class="kpi-value" id="statVisitedNoService">--</div></div>
+        <div class="kpi-card"><div class="kpi-label">🎯 ใช้บริการแต่ไม่ได้ลงทะเบียน</div><div class="kpi-value" id="statUsedNoAccount">--</div></div>
+        <div class="kpi-card"><div class="kpi-label">✅ เข้ามาและลงทะเบียนแล้ว</div><div class="kpi-value" id="statRegistered">--</div></div>
+        <div class="kpi-card"><div class="kpi-label">❤️ ยอดถูกใจรวม</div><div class="kpi-value" id="statFavCount">--</div></div>
+        <div class="kpi-card"><div class="kpi-label">🔍 จำนวนครั้งที่ค้นหา</div><div class="kpi-value" id="statTotalSearches">--</div></div>
+        <div class="kpi-card"><div class="kpi-label">🔄 สุ่มใหม่ / ปฏิเสธผล</div><div class="kpi-value" id="statTotalRespins">--</div></div>
       </div>
 
-      <div class="section-mini">🔥 ร้านที่ถูกสุ่มบ่อยที่สุด</div>
-      <div id="topSpunList"></div>
-
-      <div class="section-mini">❤️ อันดับร้านที่มีคนถูกใจมากที่สุด</div>
-      <div id="topFavoritedList"></div>
-
-      <div class="section-mini">🔍 อันดับคำค้นหายอดนิยม</div>
-      <div id="topSearchList"></div>
-
-      <div class="section-mini">✅ ร้านที่ใช้บริการจริงมากที่สุด</div>
-      <div class="hint" style="margin-bottom:8px;">นับเมื่อผู้ใช้กดโทรจองโต๊ะ / จองผ่านแอป / สั่งเดลิเวอรี่ — เปอร์เซ็นต์คำนวณจากยอดใช้บริการจริงทั้งหมด</div>
-      <div class="table-scroll">
-        <table class="admin-table">
-          <thead><tr><th>ร้าน</th><th>ใช้บริการจริง (ครั้ง)</th><th>% ของยอดใช้บริการจริง</th></tr></thead>
-          <tbody id="visitTableBody"></tbody>
-        </table>
+      <div class="chart-row" style="grid-template-columns:1fr;">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">❤️ อันดับร้านที่มีคนถูกใจมากที่สุด</div></div>
+          <div id="topFavoritedList"></div>
+        </div>
       </div>
 
-      <div class="section-mini">🔄 ร้านที่ถูกสุ่มใหม่ (ปฏิเสธผล) มากที่สุด</div>
-      <div class="hint" style="margin-bottom:8px;">นับเมื่อผู้ใช้กด "หมุนอีกครั้ง" หลังได้ร้านนั้นจากวงล้อ — เปอร์เซ็นต์คำนวณจากยอดสุ่มใหม่ทั้งหมด</div>
-      <div class="table-scroll">
-        <table class="admin-table">
-          <thead><tr><th>ร้าน</th><th>สุ่มใหม่ (ครั้ง)</th><th>% ของยอดสุ่มใหม่</th></tr></thead>
-          <tbody id="respinTableBody"></tbody>
-        </table>
+      <div class="chart-row" style="grid-template-columns:1fr;">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">🔍 อันดับคำค้นหายอดนิยม</div></div>
+          <div id="topSearchList"></div>
+        </div>
       </div>
 
-      <div class="section-mini">🕐 ประวัติการสุ่ม/ค้นหาล่าสุด</div>
-      <div id="recentLogList"></div>
+      <div class="bottom-row">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">✅ ร้านที่ใช้บริการจริงมากที่สุด</div></div>
+          <div class="hint" style="margin-bottom:8px;">นับเมื่อผู้ใช้กดโทรจองโต๊ะ / จองผ่านแอป / สั่งเดลิเวอรี่</div>
+          <div class="table-scroll">
+            <table class="admin-table">
+              <thead><tr><th>ร้าน</th><th>ครั้ง</th><th>%</th></tr></thead>
+              <tbody id="visitTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">🔄 ร้านที่ถูกสุ่มใหม่มากที่สุด</div></div>
+          <div class="hint" style="margin-bottom:8px;">นับเมื่อผู้ใช้กด "หมุนอีกครั้ง" หลังได้ร้านนั้น</div>
+          <div class="table-scroll">
+            <table class="admin-table">
+              <thead><tr><th>ร้าน</th><th>ครั้ง</th><th>%</th></tr></thead>
+              <tbody id="respinTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-row" style="grid-template-columns:1fr;margin-top:14px;">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">🕐 กิจกรรมล่าสุด</div></div>
+          <div id="recentLogList"></div>
+        </div>
+      </div>
     </div>
+    </div>
+   </div>
   </section>
 
 </main>
@@ -1352,6 +1587,7 @@ function switchMainTab(tab){
   $(".filters").classList.add("hidden");
   $(".view-toggle-bar").classList.add("hidden");
   $("#adminSection").classList.add("hidden");
+  document.body.classList.toggle("admin-wide", tab==="admin");
 
   if(tab==="home"){
     $(".filters").classList.remove("hidden");
@@ -1381,8 +1617,10 @@ function switchMainTab(tab){
   } else if(tab==="admin"){
     if(!state.currentUser || state.currentUser.role!=="admin"){ switchMainTab("home"); return; }
     $("#adminSection").classList.remove("hidden");
-    renderAdminTable();
-    renderAnalytics();
+    // Route through switchAdminSubTab so the sidebar, tabs and header title all stay in sync
+    // and only the visible panel does a fetch.
+    const activeBtn = document.querySelector("#adminInnerTabs .nav-tab.active");
+    switchAdminSubTab(activeBtn ? activeBtn.dataset.atab : "data");
   }
 }
 $all(".nav-tab[data-tab]").forEach(t=>t.addEventListener("click",()=>switchMainTab(t.dataset.tab)));
@@ -1744,19 +1982,31 @@ $("#assistantFab").addEventListener("click",()=>{
 });
 
 /* ================= ADMIN: DATA MANAGEMENT ================= */
+const ADMIN_TAB_HEADINGS = {
+  analytics: ["ภาพรวมประสิทธิภาพแอป", "ข้อมูลสรุปภาพรวมการใช้งานและร้านยอดนิยม"],
+  data:      ["จัดการร้านอาหาร", "เพิ่ม แก้ไข และลบข้อมูลร้านในระบบ"],
+  customers: ["ข้อมูลลูกค้า", "รายชื่อสมาชิก ข้อมูลติดต่อ และสถานะความยินยอม PDPA"],
+  feedback:  ["ความคิดเห็นจากลูกค้า", "แยกตามสิ่งที่ชอบ ไม่ชอบ และสิ่งที่ควรปรับปรุง"]
+};
 function switchAdminSubTab(tab){
   $all("#adminInnerTabs .nav-tab").forEach(x=>x.classList.toggle("active", x.dataset.atab===tab));
+  $all("#dashNav .dash-nav-item").forEach(x=>x.classList.toggle("active", x.dataset.atab===tab));
   $("#adminDataPanel").classList.toggle("hidden", tab!=="data");
   $("#adminCustomersPanel").classList.toggle("hidden", tab!=="customers");
   $("#adminFeedbackPanel").classList.toggle("hidden", tab!=="feedback");
   $("#adminAnalyticsPanel").classList.toggle("hidden", tab!=="analytics");
+  const heading = ADMIN_TAB_HEADINGS[tab];
+  if(heading){
+    $("#dashHeaderTitle").textContent = heading[0];
+    $("#dashHeaderSub").textContent = heading[1];
+  }
   saveLastLocation("admin", tab);
   if(tab==="analytics") renderAnalytics();
   if(tab==="customers") renderCustomerTable();
   if(tab==="feedback") renderFeedbackList();
   if(tab==="data"){ fetchRestaurants().then(renderAdminTable).catch(()=>{}); }
 }
-$all("#adminInnerTabs .nav-tab").forEach(t=>{
+$all("#adminInnerTabs .nav-tab, #dashNav .dash-nav-item").forEach(t=>{
   t.addEventListener("click",()=>switchAdminSubTab(t.dataset.atab));
 });
 /* ================= ADMIN: CUSTOMERS ================= */
@@ -1993,6 +2243,111 @@ async function saveRestaurant(){
 }
 
 /* ================= ADMIN: ANALYTICS ================= */
+/* ---- chart helpers (inline SVG, no libraries) ---- */
+const CHART_COLORS = ["var(--chart-1)","var(--chart-2)","var(--chart-3)","var(--chart-4)","var(--chart-5)","var(--chart-6)"];
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function renderLineChart(hostId, points, labelKey, valueKey){
+  const host = $("#"+hostId);
+  const vals = points.map(p=>p[valueKey]);
+  if(!points.length || vals.every(v=>v===0)){
+    host.innerHTML = '<div class="chart-empty">ยังไม่มีข้อมูลกิจกรรมในช่วง 14 วันนี้</div>';
+    return;
+  }
+  const W = 520, H = 190, padL = 34, padR = 10, padT = 12, padB = 26;
+  const max = Math.max(...vals, 1);
+  // round the axis top up to something readable rather than an arbitrary max
+  const step = Math.max(1, Math.ceil(max/4));
+  const axisTop = step*4;
+  const x = i => padL + (points.length===1 ? (W-padL-padR)/2 : i*(W-padL-padR)/(points.length-1));
+  const y = v => padT + (1 - v/axisTop)*(H-padT-padB);
+
+  let grid = "", yLabels = "";
+  for(let i=0;i<=4;i++){
+    const v = step*i, gy = y(v);
+    grid += '<line x1="'+padL+'" y1="'+gy+'" x2="'+(W-padR)+'" y2="'+gy+'" stroke="var(--border)" stroke-width="1"/>';
+    yLabels += '<text x="'+(padL-6)+'" y="'+(gy+3.5)+'" text-anchor="end" font-size="9" fill="var(--text-soft)">'+v+'</text>';
+  }
+  const line = points.map((p,i)=> x(i)+","+y(p[valueKey])).join(" ");
+  const area = padL+","+y(0)+" "+line+" "+x(points.length-1)+","+y(0);
+  const dots = points.map((p,i)=>
+    '<circle cx="'+x(i)+'" cy="'+y(p[valueKey])+'" r="3" fill="var(--primary)" stroke="var(--card-bg)" stroke-width="1.5"><title>'+
+    esc(p[labelKey])+': '+p[valueKey]+'</title></circle>').join("");
+  // only every other date label, otherwise they collide on narrow screens
+  const xLabels = points.map((p,i)=> i%2===0
+    ? '<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="8.5" fill="var(--text-soft)">'+esc(p[labelKey].slice(5))+'</text>'
+    : "").join("");
+
+  host.innerHTML =
+    '<svg class="line-chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" role="img">'+
+      '<defs><linearGradient id="lcFill" x1="0" y1="0" x2="0" y2="1">'+
+        '<stop offset="0%" stop-color="var(--primary)" stop-opacity="0.28"/>'+
+        '<stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/>'+
+      '</linearGradient></defs>'+
+      grid + yLabels +
+      '<polygon points="'+area+'" fill="url(#lcFill)"/>'+
+      '<polyline points="'+line+'" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      dots + xLabels +
+    '</svg>';
+}
+
+function renderDonut(hostId, items, emptyMsg){
+  const host = $("#"+hostId);
+  const total = items.reduce((s,i)=>s+i.count,0);
+  if(!total){
+    host.innerHTML = '<div class="chart-empty">'+emptyMsg+'</div>';
+    return;
+  }
+  const top = items.slice(0,5);
+  const restCount = items.slice(5).reduce((s,i)=>s+i.count,0);
+  if(restCount) top.push({label:"อื่นๆ", count:restCount});
+
+  const R = 52, C = 2*Math.PI*R;
+  let offset = 0;
+  const segs = top.map((it,i)=>{
+    const frac = it.count/total;
+    const seg = '<circle cx="70" cy="70" r="'+R+'" fill="none" stroke="'+CHART_COLORS[i%CHART_COLORS.length]+'"'+
+      ' stroke-width="20" stroke-dasharray="'+(frac*C)+' '+C+'" stroke-dashoffset="'+(-offset*C)+'"'+
+      ' transform="rotate(-90 70 70)"><title>'+esc(it.label)+': '+it.count+'</title></circle>';
+    offset += frac;
+    return seg;
+  }).join("");
+
+  const legend = top.map((it,i)=>
+    '<div class="legend-item"><span class="legend-dot" style="background:'+CHART_COLORS[i%CHART_COLORS.length]+'"></span>'+
+    '<span style="flex:1;">'+esc(it.label)+'</span><b style="color:var(--text);">'+Math.round(it.count/total*100)+'%</b></div>'
+  ).join("");
+
+  host.innerHTML =
+    '<div class="donut-wrap">'+
+      '<svg width="140" height="140" viewBox="0 0 140 140" role="img">'+
+        '<circle cx="70" cy="70" r="'+R+'" fill="none" stroke="var(--border)" stroke-width="20"/>'+
+        segs+
+        '<text x="70" y="66" text-anchor="middle" font-size="19" font-weight="800" fill="var(--text)">'+total+'</text>'+
+        '<text x="70" y="82" text-anchor="middle" font-size="9" fill="var(--text-soft)">ครั้ง</text>'+
+      '</svg>'+
+      '<div class="donut-legend">'+legend+'</div>'+
+    '</div>';
+}
+
+function setDelta(id, pct){
+  const node = $("#"+id);
+  if(pct === null || pct === undefined){
+    node.className = "kpi-delta flat";
+    node.textContent = "— ไม่มีข้อมูลเทียบ 14 วันก่อน";
+    return;
+  }
+  const up = pct >= 0;
+  node.className = "kpi-delta " + (pct === 0 ? "flat" : up ? "up" : "down");
+  node.textContent = (pct === 0 ? "▬ " : up ? "▲ " : "▼ ") + Math.abs(pct) + "% จาก 14 วันก่อน";
+}
+
+let dashDailyData = [];
+$("#dashMetricSelect").addEventListener("change", ()=>{
+  renderLineChart("dashLineChart", dashDailyData, "day", $("#dashMetricSelect").value);
+});
+$("#dashSeeAllRestaurants").addEventListener("click", ()=> switchAdminSubTab("data"));
+
 async function renderAnalytics(){
   let analytics;
   try{
@@ -2005,10 +2360,116 @@ async function renderAnalytics(){
   const allVisits = analytics.visitLog;
   const allRespins = analytics.respinLog;
   const allSearches = analytics.searchLog;
+  const dash = analytics.dashboard || {};
+  const deltas = dash.deltas || {};
 
   refreshActiveUsers();
-  $("#statTotalSpins").textContent = allSpins.length;
-  $("#statTotalUsers").textContent = analytics.totalUsers;
+  $("#dashSideUpdated").textContent = "อัปเดตล่าสุด " + new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});
+  if(state.currentUser) $("#dashSideUser").textContent = state.currentUser.name;
+
+  /* --- KPI row --- */
+  $("#kpiSpins").textContent = allSpins.length;
+  $("#kpiVisits").textContent = allVisits.length;
+  $("#kpiUsers").textContent = analytics.totalUsers;
+  $("#kpiBookings").textContent = dash.totalBookings != null ? dash.totalBookings : "--";
+  setDelta("kpiSpinsDelta", deltas.spins);
+  setDelta("kpiVisitsDelta", deltas.visits);
+  setDelta("kpiUsersDelta", deltas.users);
+  setDelta("kpiBookingsDelta", deltas.bookings);
+
+  const topRestaurants = dash.topRestaurants || [];
+  if(topRestaurants.length){
+    const t = topRestaurants[0];
+    $("#kpiTopName").textContent = (TYPE_EMOJI[t.type]||"🍽️") + " " + t.name;
+    $("#kpiTopSub").className = "kpi-delta flat";
+    $("#kpiTopSub").textContent = "ถูกสุ่ม " + t.spins + " ครั้ง";
+  } else {
+    $("#kpiTopName").textContent = "—";
+    $("#kpiTopSub").className = "kpi-delta flat";
+    $("#kpiTopSub").textContent = "ยังไม่มีข้อมูลการสุ่ม";
+  }
+
+  /* --- charts --- */
+  dashDailyData = dash.daily || [];
+  renderLineChart("dashLineChart", dashDailyData, "day", $("#dashMetricSelect").value);
+  renderDonut("dashCategoryDonut", dash.byCategory || [], "ยังไม่มีข้อมูลการสุ่ม");
+  renderDonut("dashChannelDonut", dash.byChannel || [], "ยังไม่มีข้อมูลการใช้บริการ");
+
+  /* --- ranked restaurants --- */
+  const rankWrap = $("#dashTopRestaurants");
+  rankWrap.innerHTML = "";
+  if(!topRestaurants.length){
+    rankWrap.appendChild(el("div","hint-box","ยังไม่มีข้อมูลการสุ่ม ลองไปหมุนวงล้อดูก่อน!"));
+  } else {
+    const maxSpins = topRestaurants[0].spins || 1;
+    const totalSpins = allSpins.length || 1;
+    topRestaurants.forEach((r,i)=>{
+      const row = el("div","rank-row");
+      row.innerHTML =
+        '<div class="rank-badge'+(i<3?" top":"")+'">'+(i+1)+'</div>'+
+        '<div class="rank-emoji">'+(TYPE_EMOJI[r.type]||"🍽️")+'</div>'+
+        '<div class="rank-main">'+
+          '<div class="rank-name">'+esc(r.name)+'</div>'+
+          '<div class="rank-sub">'+esc(r.type)+' · สุ่ม '+r.spins+' · ใช้จริง '+r.visits+'</div>'+
+        '</div>'+
+        '<div class="rank-bar-wrap">'+
+          '<div class="rank-bar-track"><div class="rank-bar-fill" style="width:'+Math.round(r.spins/maxSpins*100)+'%;background:'+CHART_COLORS[i%CHART_COLORS.length]+'"></div></div>'+
+          '<div class="rank-pct">'+Math.round(r.spins/totalSpins*1000)/10+'%</div>'+
+        '</div>';
+      rankWrap.appendChild(row);
+    });
+  }
+
+  /* --- insights (derived from the numbers above, not hardcoded) --- */
+  const insights = [];
+  if(deltas.spins !== null && deltas.spins !== undefined){
+    insights.push({
+      icon: deltas.spins >= 0 ? "📈" : "📉",
+      title: deltas.spins >= 0 ? "การใช้งานเพิ่มขึ้น" : "การใช้งานลดลง",
+      desc: "ยอดหมุนวงล้อ "+(deltas.spins>=0?"เพิ่มขึ้น":"ลดลง")+" "+Math.abs(deltas.spins)+"% เมื่อเทียบกับช่วง 14 วันก่อนหน้า"
+    });
+  }
+  if(topRestaurants.length){
+    const t = topRestaurants[0];
+    insights.push({
+      icon:"⭐", title:"ร้านยอดนิยม",
+      desc: t.name+" ถูกสุ่มมากที่สุด คิดเป็น "+(Math.round(t.spins/(allSpins.length||1)*1000)/10)+"% ของการสุ่มทั้งหมด"
+    });
+  }
+  if(allSpins.length){
+    const conv = Math.round(allVisits.length/allSpins.length*1000)/10;
+    insights.push({
+      icon:"✅", title:"อัตราการใช้บริการจริง",
+      desc: "จากการสุ่ม "+allSpins.length+" ครั้ง มีการกดใช้บริการจริง "+allVisits.length+" ครั้ง ("+conv+"%)"
+    });
+  }
+  if((dash.byChannel||[]).length){
+    const c = dash.byChannel[0];
+    const chTotal = dash.byChannel.reduce((s,x)=>s+x.count,0);
+    insights.push({
+      icon:"🛵", title:"ช่องทางยอดนิยม",
+      desc: c.label+" ถูกใช้มากที่สุด คิดเป็น "+Math.round(c.count/chTotal*100)+"% ของการใช้บริการทั้งหมด"
+    });
+  }
+  if(dash.avgRating != null){
+    insights.push({
+      icon:"💬", title:"คะแนนรีวิวเฉลี่ย",
+      desc: "ลูกค้าให้คะแนนเฉลี่ย "+dash.avgRating+" ดาว จากทั้งหมด "+dash.totalReviews+" รีวิว"
+    });
+  }
+  const insightWrap = $("#dashInsights");
+  insightWrap.innerHTML = "";
+  if(!insights.length){
+    insightWrap.appendChild(el("div","hint-box","ยังไม่มีข้อมูลมากพอสำหรับสรุปเชิงลึก"));
+  } else {
+    insights.forEach(it=>{
+      const row = el("div","insight-item");
+      row.innerHTML = '<div class="insight-icon">'+it.icon+'</div>'+
+        '<div><div class="insight-title">'+it.title+'</div><div class="insight-desc">'+esc(it.desc)+'</div></div>';
+      insightWrap.appendChild(row);
+    });
+  }
+
   $("#statFavCount").textContent = analytics.totalFavorites;
   $("#statTotalSearches").textContent = analytics.totalSearches;
 
@@ -2017,23 +2478,6 @@ async function renderAnalytics(){
   $("#statVisitedNoService").textContent = funnel.visitedNoService;
   $("#statUsedNoAccount").textContent = funnel.usedServiceNoAccount;
   $("#statRegistered").textContent = analytics.totalUsers;
-
-  const counts = {};
-  allSpins.forEach(h=>{ counts[h.name] = (counts[h.name]||0)+1; });
-  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const topWrap = $("#topSpunList");
-  topWrap.innerHTML="";
-  if(!top.length){
-    topWrap.appendChild(el("div","hint-box","ยังไม่มีข้อมูลการสุ่ม ลองไปหมุนวงล้อดูก่อน!"));
-  } else {
-    const max = top[0][1];
-    top.forEach(([name,count])=>{
-      const row = el("div","bar-row");
-      row.innerHTML = '<div class="bar-label"><span>'+name+'</span><span>'+count+' ครั้ง</span></div>'+
-        '<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(count/max*100)+'%"></div></div>';
-      topWrap.appendChild(row);
-    });
-  }
 
   const favWrap = $("#topFavoritedList");
   favWrap.innerHTML="";
@@ -2067,7 +2511,6 @@ async function renderAnalytics(){
 
   const totalVisits = allVisits.length;
   const totalRespins = allRespins.length;
-  $("#statTotalVisits").textContent = totalVisits + (allSpins.length ? " ("+Math.round(totalVisits/allSpins.length*100)+"%)" : "");
   $("#statTotalRespins").textContent = totalRespins + (allSpins.length ? " ("+Math.round(totalRespins/allSpins.length*100)+"%)" : "");
 
   function countByRestaurant(log){
@@ -2139,7 +2582,7 @@ function startHeartbeat(){
 async function refreshActiveUsers(){
   try{
     const r = await apiFetch("/api/active-users");
-    $("#statActiveUsers").textContent = r.activeNow;
+    $("#dashLiveCount").textContent = r.activeNow;
   }catch(e){}
 }
 // Keeps whichever admin sub-panel is currently open live, without a manual refresh.
