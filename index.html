@@ -560,6 +560,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
         <div class="dash-header-actions">
           <span class="dash-chip" id="dashLiveChip">🟢 กำลังใช้งาน <b id="dashLiveCount">--</b></span>
           <button class="btn btn-outline" id="exportExcelBtn" style="flex:none;padding:8px 14px;">📊 ส่งออก Excel</button>
+          <button class="btn btn-outline" id="exportCsvBtn" style="flex:none;padding:8px 14px;">📄 ส่งออก CSV</button>
         </div>
       </div>
 
@@ -943,6 +944,17 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
       <div class="wizard-opt" data-theme="dark" style="width:100%;text-align:left;">🌙 โหมดมืด</div>
       <div class="wizard-opt" data-theme="auto" style="width:100%;text-align:left;">🖥️ ตามอุปกรณ์ (อัตโนมัติ)</div>
     </div>
+  </div>
+</div>
+
+<!-- ============ CSV EXPORT MODAL ============ -->
+<div class="overlay" id="csvOverlay">
+  <div class="modal">
+    <button class="modal-close" data-close="csvOverlay">✕</button>
+    <div class="modal-title">📄 ส่งออกเป็น CSV</div>
+    <div class="modal-sub">ไฟล์ CSV เก็บได้ 1 ตารางต่อไฟล์ — เลือกชุดข้อมูลที่ต้องการดาวน์โหลด</div>
+    <div id="csvDatasetList"></div>
+    <div class="hint-box">ไฟล์บันทึกเป็น UTF-8 พร้อม BOM จึงเปิดใน Excel แล้วภาษาไทยไม่เพี้ยน · ถ้าต้องการทุกตารางในไฟล์เดียว ใช้ปุ่ม "ส่งออก Excel" แทน</div>
   </div>
 </div>
 
@@ -2144,38 +2156,70 @@ $("#reseedBtn").addEventListener("click",async ()=>{
 });
 
 /* ================= ADMIN: EXPORT TO EXCEL ================= */
-const EXPORT_BTN_LABEL = "📊 ดาวน์โหลดข้อมูลทั้งหมดเป็น Excel";
-$("#exportExcelBtn").addEventListener("click", async ()=>{
-  const btn = $("#exportExcelBtn");
-  btn.disabled = true;
-  btn.textContent = "⏳ กำลังสร้างไฟล์...";
+// Can't use a plain <a href> or window.open for these — the endpoints are admin-only and
+// the token has to travel in an Authorization header, so fetch the file then save the blob.
+async function downloadExport(url, filename, btn, busyLabel){
+  const original = btn ? btn.textContent : null;
+  if(btn){ btn.disabled = true; btn.textContent = busyLabel; }
   let objectUrl = null;
   try{
-    // Can't use a plain <a href> or window.open here — the endpoint is admin-only and the
-    // token has to travel in an Authorization header, so fetch the file then save the blob.
-    const res = await fetch("/api/export/excel", {headers: authHeaders()});
+    const res = await fetch(url, {headers: authHeaders()});
     if(!res.ok){
       let msg = "ดาวน์โหลดไม่สำเร็จ ("+res.status+")";
       try{ const data = await res.json(); if(data && data.error) msg = data.error; }catch(e){}
       throw new Error(msg);
     }
     const blob = await res.blob();
-    const stamp = new Date().toISOString().slice(0,10);
     objectUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = objectUrl;
-    a.download = "kin-arai-dee-export-"+stamp+".xlsx";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    showToast("✅ ดาวน์โหลดไฟล์ Excel เรียบร้อย");
+    showToast("✅ ดาวน์โหลด "+filename+" เรียบร้อย");
   }catch(err){
     showToast("⚠️ "+err.message);
   }finally{
     if(objectUrl) setTimeout(()=>URL.revokeObjectURL(objectUrl), 10000);
-    btn.disabled = false;
-    btn.textContent = EXPORT_BTN_LABEL;
+    if(btn){ btn.disabled = false; btn.textContent = original; }
   }
+}
+const todayStamp = ()=> new Date().toISOString().slice(0,10);
+
+$("#exportExcelBtn").addEventListener("click", ()=>{
+  downloadExport("/api/export/excel", "kin-arai-dee-export-"+todayStamp()+".xlsx",
+    $("#exportExcelBtn"), "⏳ กำลังสร้าง...");
+});
+
+// Keys must match the dataset keys returned by buildExportDatasets() on the server.
+const CSV_DATASETS = [
+  ["summary","📋 สรุปภาพรวม"],
+  ["restaurants","🍽️ ร้านอาหาร"],
+  ["users","👥 ลูกค้า"],
+  ["bookings","📅 รายการจอง"],
+  ["feedback","💬 ความคิดเห็น"],
+  ["reviews","⭐ รีวิวร้าน"],
+  ["spins","🎡 ประวัติการสุ่ม"],
+  ["visits","✅ ใช้บริการจริง"],
+  ["respins","🔄 สุ่มใหม่ (ปฏิเสธผล)"],
+  ["searches","🔍 ประวัติการค้นหา"]
+];
+$("#exportCsvBtn").addEventListener("click", ()=>{
+  const wrap = $("#csvDatasetList");
+  wrap.innerHTML = "";
+  CSV_DATASETS.forEach(([key,label])=>{
+    const row = el("button","btn btn-outline btn-block");
+    row.style.textAlign = "left";
+    row.style.marginTop = "6px";
+    row.textContent = label;
+    row.addEventListener("click", ()=>{
+      downloadExport("/api/export/csv?dataset="+encodeURIComponent(key),
+        "kin-arai-dee-"+key+"-"+todayStamp()+".csv", row, "⏳ กำลังสร้าง...");
+    });
+    wrap.appendChild(row);
+  });
+  openModal("csvOverlay");
 });
 
 function openEditModal(id){
@@ -2356,10 +2400,10 @@ async function renderAnalytics(){
     showToast("⚠️ โหลดสถิติไม่สำเร็จ: "+err.message);
     return;
   }
-  const allSpins = analytics.spinHistory;
-  const allVisits = analytics.visitLog;
-  const allRespins = analytics.respinLog;
-  const allSearches = analytics.searchLog;
+  // Totals now come from server-side COUNT(*); the log arrays are short "recent activity"
+  // slices only, so never use their .length as a total.
+  const totals = analytics.totals || {spins:0, visits:0, respins:0, searches:0};
+  const recent = analytics.recent || {spins:[], visits:[], respins:[], searches:[]};
   const dash = analytics.dashboard || {};
   const deltas = dash.deltas || {};
 
@@ -2368,8 +2412,8 @@ async function renderAnalytics(){
   if(state.currentUser) $("#dashSideUser").textContent = state.currentUser.name;
 
   /* --- KPI row --- */
-  $("#kpiSpins").textContent = allSpins.length;
-  $("#kpiVisits").textContent = allVisits.length;
+  $("#kpiSpins").textContent = totals.spins;
+  $("#kpiVisits").textContent = totals.visits;
   $("#kpiUsers").textContent = analytics.totalUsers;
   $("#kpiBookings").textContent = dash.totalBookings != null ? dash.totalBookings : "--";
   setDelta("kpiSpinsDelta", deltas.spins);
@@ -2402,7 +2446,7 @@ async function renderAnalytics(){
     rankWrap.appendChild(el("div","hint-box","ยังไม่มีข้อมูลการสุ่ม ลองไปหมุนวงล้อดูก่อน!"));
   } else {
     const maxSpins = topRestaurants[0].spins || 1;
-    const totalSpins = allSpins.length || 1;
+    const totalSpins = totals.spins || 1;
     topRestaurants.forEach((r,i)=>{
       const row = el("div","rank-row");
       row.innerHTML =
@@ -2433,14 +2477,14 @@ async function renderAnalytics(){
     const t = topRestaurants[0];
     insights.push({
       icon:"⭐", title:"ร้านยอดนิยม",
-      desc: t.name+" ถูกสุ่มมากที่สุด คิดเป็น "+(Math.round(t.spins/(allSpins.length||1)*1000)/10)+"% ของการสุ่มทั้งหมด"
+      desc: t.name+" ถูกสุ่มมากที่สุด คิดเป็น "+(Math.round(t.spins/(totals.spins||1)*1000)/10)+"% ของการสุ่มทั้งหมด"
     });
   }
-  if(allSpins.length){
-    const conv = Math.round(allVisits.length/allSpins.length*1000)/10;
+  if(totals.spins){
+    const conv = Math.round(totals.visits/totals.spins*1000)/10;
     insights.push({
       icon:"✅", title:"อัตราการใช้บริการจริง",
-      desc: "จากการสุ่ม "+allSpins.length+" ครั้ง มีการกดใช้บริการจริง "+allVisits.length+" ครั้ง ("+conv+"%)"
+      desc: "จากการสุ่ม "+totals.spins+" ครั้ง มีการกดใช้บริการจริง "+totals.visits+" ครั้ง ("+conv+"%)"
     });
   }
   if((dash.byChannel||[]).length){
@@ -2509,15 +2553,8 @@ async function renderAnalytics(){
     });
   }
 
-  const totalVisits = allVisits.length;
-  const totalRespins = allRespins.length;
-  $("#statTotalRespins").textContent = totalRespins + (allSpins.length ? " ("+Math.round(totalRespins/allSpins.length*100)+"%)" : "");
+  $("#statTotalRespins").textContent = totals.respins + (totals.spins ? " ("+Math.round(totals.respins/totals.spins*100)+"%)" : "");
 
-  function countByRestaurant(log){
-    const map = {};
-    log.forEach(v=>{ map[v.id] = map[v.id] || {id:v.id,name:v.name,count:0}; map[v.id].count++; });
-    return Object.values(map).sort((a,b)=>b.count-a.count);
-  }
   function renderRankTable(bodyId, rows, total, emptyMsg){
     const body = $("#"+bodyId);
     body.innerHTML="";
@@ -2528,20 +2565,23 @@ async function renderAnalytics(){
     rows.forEach(r=>{
       const pct = total ? Math.round(r.count/total*100) : 0;
       const tr = el("tr");
-      tr.innerHTML = '<td>'+r.name+'</td><td>'+r.count+'</td><td>'+pct+'%</td>';
+      tr.innerHTML = '<td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+pct+'%</td>';
       body.appendChild(tr);
     });
   }
-  renderRankTable("visitTableBody", countByRestaurant(allVisits), totalVisits, "ยังไม่มีข้อมูลการใช้บริการจริง ลองกดโทร/จองผ่านแอป/สั่งเดลิเวอรี่ดูก่อน");
-  renderRankTable("respinTableBody", countByRestaurant(allRespins), totalRespins, "ยังไม่มีการสุ่มใหม่ ลองกด \"หมุนอีกครั้ง\" หลังได้ผลจากวงล้อดูก่อน");
+  // Rankings are aggregated server-side now instead of counting a truncated log client-side.
+  renderRankTable("visitTableBody", analytics.topVisited || [], totals.visits, "ยังไม่มีข้อมูลการใช้บริการจริง ลองกดโทร/จองผ่านแอป/สั่งเดลิเวอรี่ดูก่อน");
+  renderRankTable("respinTableBody", analytics.topRespun || [], totals.respins, "ยังไม่มีการสุ่มใหม่ ลองกด \"หมุนอีกครั้ง\" หลังได้ผลจากวงล้อดูก่อน");
 
   const logWrap = $("#recentLogList");
   logWrap.innerHTML="";
+  // esc() because these carry user-supplied text (restaurant names, search terms) and
+  // el() assigns via innerHTML.
   const combined = [
-    ...allSpins.slice(0,8).map(h=>({text:"🎯 สุ่มได้ "+h.name,time:new Date(h.time)})),
-    ...allVisits.slice(0,8).map(v=>({text:"✅ "+v.name+" — "+v.action,time:new Date(v.time)})),
-    ...allRespins.slice(0,8).map(v=>({text:"🔄 สุ่มใหม่ (ปฏิเสธ "+v.name+")",time:new Date(v.time)})),
-    ...allSearches.slice(0,8).map(s=>({text:"🔍 ค้นหา \""+s.term+"\"",time:new Date(s.time)}))
+    ...recent.spins.map(h=>({text:"🎯 สุ่มได้ "+esc(h.name),time:new Date(h.time)})),
+    ...recent.visits.map(v=>({text:"✅ "+esc(v.name)+" — "+esc(v.action),time:new Date(v.time)})),
+    ...recent.respins.map(v=>({text:"🔄 สุ่มใหม่ (ปฏิเสธ "+esc(v.name)+")",time:new Date(v.time)})),
+    ...recent.searches.map(s=>({text:"🔍 ค้นหา \""+esc(s.term)+"\"",time:new Date(s.time)}))
   ].sort((a,b)=>b.time-a.time).slice(0,12);
   if(!combined.length){
     logWrap.appendChild(el("div","hint-box","ยังไม่มีกิจกรรมล่าสุด"));
@@ -2588,17 +2628,30 @@ async function refreshActiveUsers(){
 // Keeps whichever admin sub-panel is currently open live, without a manual refresh.
 // Cheap to run always: the two guards below make it a no-op unless an admin is
 // actually looking at the dashboard right now.
+let adminPollBusy = false;
 function startAdminPolling(){
-  setInterval(()=>{
+  setInterval(async ()=>{
     if(!(state.currentUser && state.currentUser.role==="admin")) return;
     if($("#adminSection").classList.contains("hidden")) return;
-    const activeBtn = document.querySelector("#adminInnerTabs .nav-tab.active");
-    const tab = activeBtn ? activeBtn.dataset.atab : "data";
-    if(tab==="analytics") renderAnalytics();
-    else if(tab==="customers") renderCustomerTable();
-    else if(tab==="feedback") renderFeedbackList();
-    else if(tab==="data") fetchRestaurants().then(renderAdminTable).catch(()=>{});
-  }, 10000);
+    // Don't burn queries (or battery) refreshing a dashboard nobody is looking at.
+    if(document.visibilityState !== "visible") return;
+    // If the previous refresh is still in flight, skip this tick instead of stacking
+    // overlapping requests — that pile-up was making the page feel sluggish.
+    if(adminPollBusy) return;
+    adminPollBusy = true;
+    try{
+      const activeBtn = document.querySelector("#adminInnerTabs .nav-tab.active");
+      const tab = activeBtn ? activeBtn.dataset.atab : "data";
+      if(tab==="analytics") await renderAnalytics();
+      else if(tab==="customers") await renderCustomerTable();
+      else if(tab==="feedback") await renderFeedbackList();
+      else if(tab==="data") await fetchRestaurants().then(renderAdminTable);
+    }catch(e){
+      /* transient refresh failure — the next tick retries */
+    }finally{
+      adminPollBusy = false;
+    }
+  }, 30000);
 }
 async function restoreSession(){
   let token;

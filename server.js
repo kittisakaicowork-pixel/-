@@ -211,6 +211,31 @@ async function initDb() {
     );
   `);
 
+  // The activity logs grow without bound and every dashboard query filters/groups on these
+  // columns. Without indexes each one is a full sequential scan, which is what made the
+  // polled dashboard drag once the tables had some history in them.
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_spin_spun_at      ON spin_history(spun_at);
+    CREATE INDEX IF NOT EXISTS idx_spin_username     ON spin_history(username);
+    CREATE INDEX IF NOT EXISTS idx_spin_restaurant   ON spin_history(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_spin_visitor      ON spin_history(visitor_id);
+    CREATE INDEX IF NOT EXISTS idx_visit_visited_at  ON visit_log(visited_at);
+    CREATE INDEX IF NOT EXISTS idx_visit_username    ON visit_log(username);
+    CREATE INDEX IF NOT EXISTS idx_visit_restaurant  ON visit_log(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_visit_visitor     ON visit_log(visitor_id);
+    CREATE INDEX IF NOT EXISTS idx_respin_respun_at  ON respin_log(respun_at);
+    CREATE INDEX IF NOT EXISTS idx_respin_username   ON respin_log(username);
+    CREATE INDEX IF NOT EXISTS idx_respin_visitor    ON respin_log(visitor_id);
+    CREATE INDEX IF NOT EXISTS idx_search_searched   ON search_log(searched_at);
+    CREATE INDEX IF NOT EXISTS idx_search_username   ON search_log(username);
+    CREATE INDEX IF NOT EXISTS idx_bookings_username ON bookings(username);
+    CREATE INDEX IF NOT EXISTS idx_bookings_created  ON bookings(created_at);
+    CREATE INDEX IF NOT EXISTS idx_reviews_restaurant ON reviews(restaurant_id);
+    CREATE INDEX IF NOT EXISTS idx_favorites_username ON favorites(username);
+    CREATE INDEX IF NOT EXISTS idx_feedback_created  ON feedback(created_at);
+    CREATE INDEX IF NOT EXISTS idx_users_registered  ON users(registered_at);
+  `);
+
   await seedRestaurants();
   await seedUsers();
 }
@@ -599,40 +624,64 @@ app.get("/api/users", requireAdmin, async (req, res) => {
 });
 
 /* ================= ADMIN: ANALYTICS ================= */
+// This endpoint is polled by the open dashboard, so it aggregates server-side and returns
+// only what the UI actually draws. It used to ship up to 2,500 raw log rows per call just
+// so the client could count them — which was both slow and wrong, since the totals were
+// silently capped by the LIMIT once the logs grew past it.
 app.get("/api/analytics", requireAdmin, async (req, res) => {
   try {
-    const { rows: userCountRows } = await pool.query("SELECT COUNT(*) FROM users");
-    const { rows: favCountRows } = await pool.query("SELECT COUNT(*) FROM favorites");
-    const { rows: spins } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, spun_at AS time FROM spin_history ORDER BY spun_at DESC LIMIT 500");
-    const { rows: visits } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, action, visited_at AS time FROM visit_log ORDER BY visited_at DESC LIMIT 1000");
-    const { rows: respins } = await pool.query("SELECT restaurant_id AS id, restaurant_name AS name, respun_at AS time FROM respin_log ORDER BY respun_at DESC LIMIT 1000");
-    const { rows: searches } = await pool.query("SELECT term, searched_at AS time FROM search_log ORDER BY searched_at DESC LIMIT 50");
+    const { rows: totalRows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM users) AS users,
+        (SELECT COUNT(*) FROM favorites) AS favorites,
+        (SELECT COUNT(*) FROM spin_history) AS spins,
+        (SELECT COUNT(*) FROM visit_log) AS visits,
+        (SELECT COUNT(*) FROM respin_log) AS respins,
+        (SELECT COUNT(*) FROM search_log) AS searches,
+        (SELECT COUNT(*) FROM bookings) AS bookings,
+        (SELECT COUNT(*) FROM reviews) AS reviews,
+        (SELECT AVG(rating)::float FROM reviews) AS avg_rating
+    `);
+    const t = totalRows[0];
+    const num = v => parseInt(v, 10);
+
+    // Small slices, only for the "recent activity" feed.
+    const { rows: recentSpins } = await pool.query("SELECT restaurant_name AS name, spun_at AS time FROM spin_history ORDER BY spun_at DESC LIMIT 10");
+    const { rows: recentVisits } = await pool.query("SELECT restaurant_name AS name, action, visited_at AS time FROM visit_log ORDER BY visited_at DESC LIMIT 10");
+    const { rows: recentRespins } = await pool.query("SELECT restaurant_name AS name, respun_at AS time FROM respin_log ORDER BY respun_at DESC LIMIT 10");
+    const { rows: recentSearches } = await pool.query("SELECT term, searched_at AS time FROM search_log ORDER BY searched_at DESC LIMIT 10");
+
     const { rows: topFavorited } = await pool.query(`
       SELECT r.name AS name, COUNT(f.username) AS count
       FROM favorites f JOIN restaurants r ON r.id = f.restaurant_id
-      GROUP BY r.id, r.name
-      ORDER BY count DESC
-      LIMIT 10
+      GROUP BY r.id, r.name ORDER BY count DESC LIMIT 10
     `);
-    const { rows: searchCountRows } = await pool.query("SELECT COUNT(*) FROM search_log");
     const { rows: topSearches } = await pool.query(`
       SELECT LOWER(TRIM(term)) AS term, COUNT(*) AS count
       FROM search_log
       WHERE term IS NOT NULL AND TRIM(term) <> ''
-      GROUP BY LOWER(TRIM(term))
-      ORDER BY count DESC
-      LIMIT 10
+      GROUP BY LOWER(TRIM(term)) ORDER BY count DESC LIMIT 10
     `);
+    // Rankings the client used to compute by counting the full log client-side.
+    const { rows: topVisited } = await pool.query(`
+      SELECT restaurant_name AS name, COUNT(*) AS count
+      FROM visit_log GROUP BY restaurant_name ORDER BY count DESC LIMIT 10
+    `);
+    const { rows: topRespun } = await pool.query(`
+      SELECT restaurant_name AS name, COUNT(*) AS count
+      FROM respin_log GROUP BY restaurant_name ORDER BY count DESC LIMIT 10
+    `);
+
     const { rows: funnelRows } = await pool.query(`
       WITH activity_visitor_ids AS (
-        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL
-        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL
-        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL
+        SELECT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL
+        UNION SELECT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL
+        UNION SELECT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL
       ),
       guest_activity_visitor_ids AS (
-        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL AND username IS NULL
-        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL AND username IS NULL
-        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL AND username IS NULL
+        SELECT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL AND username IS NULL
+        UNION SELECT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL AND username IS NULL
+        UNION SELECT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL AND username IS NULL
       )
       SELECT
         (SELECT COUNT(*) FROM visitors) AS total_visitors,
@@ -640,19 +689,27 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
         (SELECT COUNT(*) FROM guest_activity_visitor_ids) AS guest_used_service_visitors
     `);
     const fr = funnelRows[0];
-    const totalVisitors = parseInt(fr.total_visitors, 10);
-    const usedServiceVisitors = parseInt(fr.used_service_visitors, 10);
+    const totalVisitors = num(fr.total_visitors);
+    const usedServiceVisitors = num(fr.used_service_visitors);
 
-    /* --- dashboard: 14-day daily series (generate_series so empty days still show as 0) --- */
+    // One grouped scan per table joined onto the date spine, instead of 14 correlated
+    // subqueries (which re-scanned both tables once per day in the range).
     const { rows: dailyRows } = await pool.query(`
-      SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
-        (SELECT COUNT(*) FROM spin_history s WHERE s.spun_at::date = d::date) AS spins,
-        (SELECT COUNT(*) FROM visit_log v WHERE v.visited_at::date = d::date) AS visits
-      FROM generate_series(CURRENT_DATE - INTERVAL '13 days', CURRENT_DATE, INTERVAL '1 day') d
-      ORDER BY d
+      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+             COALESCE(s.c, 0) AS spins,
+             COALESCE(v.c, 0) AS visits
+      FROM generate_series(CURRENT_DATE - 13, CURRENT_DATE, INTERVAL '1 day') AS d(day)
+      LEFT JOIN (
+        SELECT spun_at::date AS day, COUNT(*) AS c FROM spin_history
+        WHERE spun_at >= CURRENT_DATE - 13 GROUP BY 1
+      ) s ON s.day = d.day
+      LEFT JOIN (
+        SELECT visited_at::date AS day, COUNT(*) AS c FROM visit_log
+        WHERE visited_at >= CURRENT_DATE - 13 GROUP BY 1
+      ) v ON v.day = d.day
+      ORDER BY d.day
     `);
 
-    /* --- dashboard: breakdowns --- */
     const { rows: byCategory } = await pool.query(`
       SELECT r.type AS label, COUNT(*) AS count
       FROM spin_history s JOIN restaurants r ON r.id = s.restaurant_id
@@ -663,8 +720,6 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       FROM visit_log WHERE action IS NOT NULL
       GROUP BY action ORDER BY count DESC
     `);
-
-    /* --- dashboard: top restaurants (spins + real visits side by side) --- */
     const { rows: topRestaurants } = await pool.query(`
       SELECT r.id, r.name, r.type,
         COUNT(s.id) AS spins,
@@ -675,7 +730,6 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
       LIMIT 5
     `);
 
-    /* --- dashboard: last 14 days vs the 14 before that, for the KPI deltas --- */
     const { rows: deltaRows } = await pool.query(`
       SELECT
         (SELECT COUNT(*) FROM spin_history WHERE spun_at >= now() - interval '14 days') AS spins_cur,
@@ -691,42 +745,45 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
     `);
     const d = deltaRows[0];
     // null (rather than 0%) when there's no prior period to compare against, so the UI
-    // can show "—" instead of a misleading +0%.
+    // can show "no comparison" instead of a misleading +0%.
     const pctChange = (cur, prev) => {
-      cur = parseInt(cur, 10); prev = parseInt(prev, 10);
-      if (!prev) return cur > 0 ? null : null;
+      cur = num(cur); prev = num(prev);
+      if (!prev) return null;
       return Math.round(((cur - prev) / prev) * 1000) / 10;
     };
 
-    const { rows: bookingCountRows } = await pool.query("SELECT COUNT(*) FROM bookings");
-    const { rows: reviewStatRows } = await pool.query("SELECT COUNT(*) AS count, AVG(rating)::float AS avg FROM reviews");
-
     res.json({
-      totalUsers: parseInt(userCountRows[0].count, 10),
-      totalFavorites: parseInt(favCountRows[0].count, 10),
-      spinHistory: spins,
-      visitLog: visits,
-      respinLog: respins,
-      searchLog: searches,
-      topFavorited: topFavorited.map(r => ({ name: r.name, count: parseInt(r.count, 10) })),
-      totalSearches: parseInt(searchCountRows[0].count, 10),
-      topSearches: topSearches.map(r => ({ term: r.term, count: parseInt(r.count, 10) })),
+      totalUsers: num(t.users),
+      totalFavorites: num(t.favorites),
+      totalSearches: num(t.searches),
+      totals: {
+        spins: num(t.spins), visits: num(t.visits),
+        respins: num(t.respins), searches: num(t.searches)
+      },
+      recent: {
+        spins: recentSpins, visits: recentVisits,
+        respins: recentRespins, searches: recentSearches
+      },
+      topFavorited: topFavorited.map(r => ({ name: r.name, count: num(r.count) })),
+      topSearches: topSearches.map(r => ({ term: r.term, count: num(r.count) })),
+      topVisited: topVisited.map(r => ({ name: r.name, count: num(r.count) })),
+      topRespun: topRespun.map(r => ({ name: r.name, count: num(r.count) })),
       visitorFunnel: {
         totalVisitors,
         visitedNoService: Math.max(0, totalVisitors - usedServiceVisitors),
-        usedServiceNoAccount: parseInt(fr.guest_used_service_visitors, 10)
+        usedServiceNoAccount: num(fr.guest_used_service_visitors)
       },
       dashboard: {
-        daily: dailyRows.map(r => ({ day: r.day, spins: parseInt(r.spins, 10), visits: parseInt(r.visits, 10) })),
-        byCategory: byCategory.map(r => ({ label: r.label, count: parseInt(r.count, 10) })),
-        byChannel: byChannel.map(r => ({ label: r.label, count: parseInt(r.count, 10) })),
+        daily: dailyRows.map(r => ({ day: r.day, spins: num(r.spins), visits: num(r.visits) })),
+        byCategory: byCategory.map(r => ({ label: r.label, count: num(r.count) })),
+        byChannel: byChannel.map(r => ({ label: r.label, count: num(r.count) })),
         topRestaurants: topRestaurants.map(r => ({
           id: r.id, name: r.name, type: r.type,
-          spins: parseInt(r.spins, 10), visits: parseInt(r.visits, 10)
+          spins: num(r.spins), visits: num(r.visits)
         })),
-        totalBookings: parseInt(bookingCountRows[0].count, 10),
-        totalReviews: parseInt(reviewStatRows[0].count, 10),
-        avgRating: reviewStatRows[0].avg ? Math.round(reviewStatRows[0].avg * 10) / 10 : null,
+        totalBookings: num(t.bookings),
+        totalReviews: num(t.reviews),
+        avgRating: t.avg_rating ? Math.round(t.avg_rating * 10) / 10 : null,
         deltas: {
           spins: pctChange(d.spins_cur, d.spins_prev),
           visits: pctChange(d.visits_cur, d.visits_prev),
@@ -739,242 +796,256 @@ app.get("/api/analytics", requireAdmin, async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "โหลดสถิติไม่สำเร็จ" }); }
 });
 
-/* ================= ADMIN: EXPORT TO EXCEL ================= */
-// Admin-only: this workbook contains every customer's personal data, so it must never
-// be reachable without an admin token (browsers can't set headers on a plain link/window.open,
-// so the frontend fetches it with the auth header and saves the blob instead).
+/* ================= ADMIN: EXPORT ================= */
+// One shared dataset builder feeds BOTH the Excel and CSV exports, so the two can never
+// drift apart. Column defs carry optional hints (dt/wrap) that only the Excel writer uses.
+async function buildExportDatasets() {
+  const joinList = v => Array.isArray(v) ? v.join(", ") : (v || "");
+
+  const { rows: restaurants } = await pool.query("SELECT * FROM restaurants ORDER BY id ASC");
+  const { rows: users } = await pool.query(`
+    SELECT u.*,
+      (SELECT COUNT(*) FROM favorites f WHERE f.username=u.username) AS fav_count,
+      (SELECT COUNT(*) FROM spin_history s WHERE s.username=u.username) AS spin_count,
+      (SELECT COUNT(*) FROM bookings b WHERE b.username=u.username) AS booking_count
+    FROM users u ORDER BY u.registered_at ASC
+  `);
+  const { rows: bookings } = await pool.query("SELECT * FROM bookings ORDER BY created_at DESC");
+  const { rows: feedback } = await pool.query(`
+    SELECT f.*, u.name AS user_name FROM feedback f
+    LEFT JOIN users u ON u.username = f.username ORDER BY f.created_at DESC
+  `);
+  const { rows: reviews } = await pool.query(`
+    SELECT rv.*, r.name AS restaurant_name, u.name AS user_name FROM reviews rv
+    LEFT JOIN restaurants r ON r.id = rv.restaurant_id
+    LEFT JOIN users u ON u.username = rv.username
+    ORDER BY rv.created_at DESC
+  `);
+  const { rows: spins } = await pool.query("SELECT * FROM spin_history ORDER BY spun_at DESC");
+  const { rows: visits } = await pool.query("SELECT * FROM visit_log ORDER BY visited_at DESC");
+  const { rows: respins } = await pool.query("SELECT * FROM respin_log ORDER BY respun_at DESC");
+  const { rows: searches } = await pool.query("SELECT * FROM search_log ORDER BY searched_at DESC");
+  const { rows: funnelRows } = await pool.query(`
+    WITH activity_visitor_ids AS (
+      SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL
+      UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL
+      UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL
+    ),
+    guest_activity_visitor_ids AS (
+      SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL AND username IS NULL
+      UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL AND username IS NULL
+      UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL AND username IS NULL
+    )
+    SELECT
+      (SELECT COUNT(*) FROM visitors) AS total_visitors,
+      (SELECT COUNT(*) FROM activity_visitor_ids) AS used_service_visitors,
+      (SELECT COUNT(*) FROM guest_activity_visitor_ids) AS guest_used_service_visitors
+  `);
+  const { rows: favTotal } = await pool.query("SELECT COUNT(*) FROM favorites");
+
+  const f = funnelRows[0];
+  const totalVisitors = parseInt(f.total_visitors, 10);
+  const usedService = parseInt(f.used_service_visitors, 10);
+  const FEEDBACK_LABEL = { good: "👍 สิ่งที่ชอบ", bad: "👎 สิ่งที่ไม่ชอบ", improvement: "💡 ควรปรับปรุง" };
+  const activityCols = extraHeader => [
+    { header: "ร้าน", key: "name", width: 30 },
+    ...(extraHeader ? [{ header: extraHeader, key: "extra", width: 26 }] : []),
+    { header: "บัญชีผู้ใช้", key: "username", width: 18 },
+    { header: "เมื่อ", key: "time", width: 20, dt: true }
+  ];
+
+  const summary = [
+    ["วันที่ออกรายงาน", new Date().toLocaleString("th-TH")],
+    ["", ""],
+    ["จำนวนร้านอาหารทั้งหมด", restaurants.length],
+    ["บัญชีลูกค้าที่สมัครแล้ว", users.length],
+    ["ยอดถูกใจรวม", parseInt(favTotal[0].count, 10)],
+    ["", ""],
+    ["เข้ามาเยี่ยมชมทั้งหมด (visitor)", totalVisitors],
+    ["เข้ามาแต่ไม่ได้ใช้บริการ", Math.max(0, totalVisitors - usedService)],
+    ["ใช้บริการแต่ไม่ได้ลงทะเบียน", parseInt(f.guest_used_service_visitors, 10)],
+    ["", ""],
+    ["จำนวนครั้งที่หมุนวงล้อ", spins.length],
+    ["ใช้บริการจริง (ครั้ง)", visits.length],
+    ["สุ่มใหม่ / ปฏิเสธผล (ครั้ง)", respins.length],
+    ["จำนวนครั้งที่ค้นหา", searches.length],
+    ["", ""],
+    ["รายการจองทั้งหมด", bookings.length],
+    ["รีวิวทั้งหมด", reviews.length],
+    ["ความคิดเห็นทั้งหมด", feedback.length],
+    ["  - 👍 สิ่งที่ชอบ", feedback.filter(x => x.type === "good").length],
+    ["  - 👎 สิ่งที่ไม่ชอบ", feedback.filter(x => x.type === "bad").length],
+    ["  - 💡 ควรปรับปรุง", feedback.filter(x => x.type === "improvement").length]
+  ];
+
+  return [
+    {
+      key: "summary", name: "สรุปภาพรวม",
+      columns: [
+        { header: "รายการ", key: "label", width: 36 },
+        { header: "ค่า", key: "value", width: 24 }
+      ],
+      rows: summary.map(([label, value]) => ({ label, value }))
+    },
+    {
+      key: "restaurants", name: "ร้านอาหาร",
+      columns: [
+        { header: "ID", key: "id", width: 6 },
+        { header: "ชื่อร้าน", key: "name", width: 30 },
+        { header: "ประเภท", key: "type", width: 22 },
+        { header: "ชั้น", key: "floor", width: 8 },
+        { header: "โซน", key: "zone", width: 28 },
+        { header: "ช่วงราคา", key: "price", width: 12 },
+        { header: "คะแนน", key: "rating", width: 9 },
+        { header: "เมนูแนะนำ", key: "recommended", width: 40 },
+        { header: "เวลาเปิด-ปิด", key: "hours", width: 16 },
+        { header: "แท็ก", key: "tags", width: 30 },
+        { header: "เบอร์ติดต่อ", key: "contact", width: 16 },
+        { header: "เดลิเวอรี่", key: "delivery", width: 24 },
+        { header: "รองรับจำนวนคน", key: "pax", width: 16 },
+        { header: "ร้านใหม่", key: "isNew", width: 10 }
+      ],
+      rows: restaurants.map(r => ({
+        id: r.id, name: r.name, type: r.type, floor: r.floor, zone: r.zone, price: r.price,
+        rating: parseFloat(r.rating), recommended: joinList(r.recommended), hours: r.hours,
+        tags: joinList(r.tags), contact: r.contact, delivery: joinList(r.delivery),
+        pax: joinList(r.pax), isNew: r.is_new ? "ใช่" : "ไม่"
+      }))
+    },
+    {
+      key: "users", name: "ลูกค้า",
+      columns: [
+        { header: "ชื่อ-นามสกุล", key: "name", width: 26 },
+        { header: "Username", key: "username", width: 18 },
+        { header: "เบอร์โทร", key: "phone", width: 16 },
+        { header: "อีเมล", key: "email", width: 28 },
+        { header: "อายุ", key: "age", width: 8 },
+        { header: "วันเกิด", key: "birthdate", width: 14 },
+        { header: "สิทธิ์", key: "role", width: 10 },
+        { header: "ยินยอม PDPA เมื่อ", key: "consentPdpaAt", width: 20, dt: true },
+        { header: "รับข่าวสาร", key: "consentMarketing", width: 12 },
+        { header: "ร้านโปรด", key: "favCount", width: 10 },
+        { header: "สุ่มแล้ว", key: "spinCount", width: 10 },
+        { header: "จองแล้ว", key: "bookingCount", width: 10 },
+        { header: "สมัครเมื่อ", key: "registeredAt", width: 20, dt: true }
+      ],
+      rows: users.map(u => ({
+        name: u.name, username: u.username, phone: u.phone || "", email: u.email || "",
+        age: u.age || "", birthdate: u.birthdate ? String(u.birthdate).slice(0, 10) : "",
+        role: u.role === "admin" ? "ผู้ดูแลระบบ" : "สมาชิก",
+        consentPdpaAt: u.consent_pdpa_at || null,
+        consentMarketing: u.consent_marketing ? "ยินยอม" : "ไม่ยินยอม",
+        favCount: parseInt(u.fav_count, 10), spinCount: parseInt(u.spin_count, 10),
+        bookingCount: parseInt(u.booking_count, 10),
+        registeredAt: u.registered_at
+      }))
+    },
+    {
+      key: "bookings", name: "รายการจอง",
+      columns: [
+        { header: "รหัสอ้างอิง", key: "ref", width: 14 },
+        { header: "ร้าน", key: "restaurantName", width: 30 },
+        { header: "วันที่จอง", key: "date", width: 14 },
+        { header: "เวลา", key: "time", width: 10 },
+        { header: "จำนวน (ท่าน)", key: "pax", width: 14 },
+        { header: "ชื่อผู้จอง", key: "bookerName", width: 24 },
+        { header: "เบอร์ติดต่อ", key: "bookerPhone", width: 16 },
+        { header: "บัญชีผู้ใช้", key: "username", width: 18 },
+        { header: "จองเมื่อ", key: "createdAt", width: 20, dt: true }
+      ],
+      rows: bookings.map(b => ({
+        ref: b.reference_code, restaurantName: b.restaurant_name,
+        date: b.booking_date ? String(b.booking_date).slice(0, 10) : "",
+        time: b.booking_time, pax: b.pax, bookerName: b.booker_name, bookerPhone: b.booker_phone,
+        username: b.username || "(ไม่ได้ล็อกอิน)", createdAt: b.created_at
+      }))
+    },
+    {
+      key: "feedback", name: "ความคิดเห็น",
+      columns: [
+        { header: "ประเภท", key: "type", width: 18 },
+        { header: "ชื่อผู้ส่ง", key: "name", width: 24 },
+        { header: "Username", key: "username", width: 18 },
+        { header: "ข้อความ", key: "message", width: 60, wrap: true },
+        { header: "ส่งเมื่อ", key: "createdAt", width: 20, dt: true }
+      ],
+      rows: feedback.map(x => ({
+        type: FEEDBACK_LABEL[x.type] || x.type, name: x.user_name || x.username,
+        username: x.username, message: x.message, createdAt: x.created_at
+      }))
+    },
+    {
+      key: "reviews", name: "รีวิวร้าน",
+      columns: [
+        { header: "ร้าน", key: "restaurantName", width: 30 },
+        { header: "คะแนน", key: "rating", width: 9 },
+        { header: "ความเห็น", key: "comment", width: 60, wrap: true },
+        { header: "ชื่อผู้รีวิว", key: "name", width: 24 },
+        { header: "Username", key: "username", width: 18 },
+        { header: "รีวิวเมื่อ", key: "createdAt", width: 20, dt: true }
+      ],
+      rows: reviews.map(rv => ({
+        restaurantName: rv.restaurant_name || "(ร้านถูกลบแล้ว)", rating: rv.rating,
+        comment: rv.comment || "", name: rv.user_name || rv.username, username: rv.username,
+        createdAt: rv.created_at
+      }))
+    },
+    {
+      key: "spins", name: "ประวัติการสุ่ม",
+      columns: activityCols(),
+      rows: spins.map(s => ({ name: s.restaurant_name, username: s.username || "(ไม่ได้ล็อกอิน)", time: s.spun_at }))
+    },
+    {
+      key: "visits", name: "ใช้บริการจริง",
+      columns: activityCols("การกระทำ"),
+      rows: visits.map(v => ({ name: v.restaurant_name, extra: v.action, username: v.username || "(ไม่ได้ล็อกอิน)", time: v.visited_at }))
+    },
+    {
+      key: "respins", name: "สุ่มใหม่ (ปฏิเสธผล)",
+      columns: activityCols(),
+      rows: respins.map(v => ({ name: v.restaurant_name, username: v.username || "(ไม่ได้ล็อกอิน)", time: v.respun_at }))
+    },
+    {
+      key: "searches", name: "ประวัติการค้นหา",
+      columns: [
+        { header: "คำค้นหา", key: "term", width: 30 },
+        { header: "บัญชีผู้ใช้", key: "username", width: 18 },
+        { header: "ค้นหาเมื่อ", key: "time", width: 20, dt: true }
+      ],
+      rows: searches.map(s => ({ term: s.term, username: s.username || "(ไม่ได้ล็อกอิน)", time: s.searched_at }))
+    }
+  ];
+}
+
+// Admin-only: these contain every customer's personal data, so they must never be
+// reachable without an admin token (browsers can't set headers on a plain link/window.open,
+// so the frontend fetches with the auth header and saves the blob instead).
 app.get("/api/export/excel", requireAdmin, async (req, res) => {
   try {
+    const datasets = await buildExportDatasets();
     const wb = new ExcelJS.Workbook();
     wb.creator = "กินอะไรดี? @ Future Park รังสิต";
     wb.created = new Date();
 
-    const DATETIME_FMT = "yyyy-mm-dd hh:mm";
-    function newSheet(name) {
-      return wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 1 }] });
-    }
-    function fillSheet(ws, columns, rows) {
-      ws.columns = columns;
+    datasets.forEach(ds => {
+      const ws = wb.addWorksheet(ds.name, { views: [{ state: "frozen", ySplit: 1 }] });
+      ws.columns = ds.columns;
       const header = ws.getRow(1);
       header.font = { bold: true, color: { argb: "FFFFFFFF" } };
       header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4C9A6A" } };
       header.alignment = { vertical: "middle" };
       header.height = 20;
-      rows.forEach(r => ws.addRow(r));
-      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
-      return ws;
-    }
-    const addSheet = (name, columns, rows) => fillSheet(newSheet(name), columns, rows);
-    const joinList = v => Array.isArray(v) ? v.join(", ") : (v || "");
-
-    // Created up front so it lands as the first tab; its rows need counts from every
-    // query below, so it gets populated at the end.
-    const summarySheet = newSheet("สรุปภาพรวม");
-
-    /* --- ร้านอาหาร --- */
-    const { rows: restaurants } = await pool.query("SELECT * FROM restaurants ORDER BY id ASC");
-    addSheet("ร้านอาหาร", [
-      { header: "ID", key: "id", width: 6 },
-      { header: "ชื่อร้าน", key: "name", width: 30 },
-      { header: "ประเภท", key: "type", width: 22 },
-      { header: "ชั้น", key: "floor", width: 8 },
-      { header: "โซน", key: "zone", width: 28 },
-      { header: "ช่วงราคา", key: "price", width: 12 },
-      { header: "คะแนน", key: "rating", width: 9 },
-      { header: "เมนูแนะนำ", key: "recommended", width: 40 },
-      { header: "เวลาเปิด-ปิด", key: "hours", width: 16 },
-      { header: "แท็ก", key: "tags", width: 30 },
-      { header: "เบอร์ติดต่อ", key: "contact", width: 16 },
-      { header: "เดลิเวอรี่", key: "delivery", width: 24 },
-      { header: "รองรับจำนวนคน", key: "pax", width: 16 },
-      { header: "ร้านใหม่", key: "isNew", width: 10 }
-    ], restaurants.map(r => ({
-      id: r.id, name: r.name, type: r.type, floor: r.floor, zone: r.zone, price: r.price,
-      rating: parseFloat(r.rating), recommended: joinList(r.recommended), hours: r.hours,
-      tags: joinList(r.tags), contact: r.contact, delivery: joinList(r.delivery),
-      pax: joinList(r.pax), isNew: r.is_new ? "ใช่" : "ไม่"
-    })));
-
-    /* --- ลูกค้า --- */
-    const { rows: users } = await pool.query(`
-      SELECT u.*,
-        (SELECT COUNT(*) FROM favorites f WHERE f.username=u.username) AS fav_count,
-        (SELECT COUNT(*) FROM spin_history s WHERE s.username=u.username) AS spin_count,
-        (SELECT COUNT(*) FROM bookings b WHERE b.username=u.username) AS booking_count
-      FROM users u ORDER BY u.registered_at ASC
-    `);
-    const usersSheet = addSheet("ลูกค้า", [
-      { header: "ชื่อ-นามสกุล", key: "name", width: 26 },
-      { header: "Username", key: "username", width: 18 },
-      { header: "เบอร์โทร", key: "phone", width: 16 },
-      { header: "อีเมล", key: "email", width: 28 },
-      { header: "อายุ", key: "age", width: 8 },
-      { header: "วันเกิด", key: "birthdate", width: 14 },
-      { header: "สิทธิ์", key: "role", width: 10 },
-      { header: "ยินยอม PDPA เมื่อ", key: "consentPdpaAt", width: 20 },
-      { header: "รับข่าวสาร", key: "consentMarketing", width: 12 },
-      { header: "ร้านโปรด", key: "favCount", width: 10 },
-      { header: "สุ่มแล้ว", key: "spinCount", width: 10 },
-      { header: "จองแล้ว", key: "bookingCount", width: 10 },
-      { header: "สมัครเมื่อ", key: "registeredAt", width: 20 }
-    ], users.map(u => ({
-      name: u.name, username: u.username, phone: u.phone || "", email: u.email || "",
-      age: u.age || "", birthdate: u.birthdate ? String(u.birthdate).slice(0, 10) : "",
-      role: u.role === "admin" ? "ผู้ดูแลระบบ" : "สมาชิก",
-      consentPdpaAt: u.consent_pdpa_at || null,
-      consentMarketing: u.consent_marketing ? "ยินยอม" : "ไม่ยินยอม",
-      favCount: parseInt(u.fav_count, 10), spinCount: parseInt(u.spin_count, 10),
-      bookingCount: parseInt(u.booking_count, 10),
-      registeredAt: u.registered_at
-    })));
-    usersSheet.getColumn("consentPdpaAt").numFmt = DATETIME_FMT;
-    usersSheet.getColumn("registeredAt").numFmt = DATETIME_FMT;
-
-    /* --- รายการจอง --- */
-    const { rows: bookings } = await pool.query("SELECT * FROM bookings ORDER BY created_at DESC");
-    const bookingSheet = addSheet("รายการจอง", [
-      { header: "รหัสอ้างอิง", key: "ref", width: 14 },
-      { header: "ร้าน", key: "restaurantName", width: 30 },
-      { header: "วันที่จอง", key: "date", width: 14 },
-      { header: "เวลา", key: "time", width: 10 },
-      { header: "จำนวน (ท่าน)", key: "pax", width: 14 },
-      { header: "ชื่อผู้จอง", key: "bookerName", width: 24 },
-      { header: "เบอร์ติดต่อ", key: "bookerPhone", width: 16 },
-      { header: "บัญชีผู้ใช้", key: "username", width: 18 },
-      { header: "จองเมื่อ", key: "createdAt", width: 20 }
-    ], bookings.map(b => ({
-      ref: b.reference_code, restaurantName: b.restaurant_name,
-      date: b.booking_date ? String(b.booking_date).slice(0, 10) : "",
-      time: b.booking_time, pax: b.pax, bookerName: b.booker_name, bookerPhone: b.booker_phone,
-      username: b.username || "(ไม่ได้ล็อกอิน)", createdAt: b.created_at
-    })));
-    bookingSheet.getColumn("createdAt").numFmt = DATETIME_FMT;
-
-    /* --- ความคิดเห็น --- */
-    const FEEDBACK_LABEL = { good: "👍 สิ่งที่ชอบ", bad: "👎 สิ่งที่ไม่ชอบ", improvement: "💡 ควรปรับปรุง" };
-    const { rows: feedback } = await pool.query(`
-      SELECT f.*, u.name AS user_name FROM feedback f
-      LEFT JOIN users u ON u.username = f.username ORDER BY f.created_at DESC
-    `);
-    const feedbackSheet = addSheet("ความคิดเห็น", [
-      { header: "ประเภท", key: "type", width: 18 },
-      { header: "ชื่อผู้ส่ง", key: "name", width: 24 },
-      { header: "Username", key: "username", width: 18 },
-      { header: "ข้อความ", key: "message", width: 60 },
-      { header: "ส่งเมื่อ", key: "createdAt", width: 20 }
-    ], feedback.map(f => ({
-      type: FEEDBACK_LABEL[f.type] || f.type, name: f.user_name || f.username,
-      username: f.username, message: f.message, createdAt: f.created_at
-    })));
-    feedbackSheet.getColumn("message").alignment = { wrapText: true, vertical: "top" };
-    feedbackSheet.getColumn("createdAt").numFmt = DATETIME_FMT;
-
-    /* --- รีวิวร้าน --- */
-    const { rows: reviews } = await pool.query(`
-      SELECT rv.*, r.name AS restaurant_name, u.name AS user_name FROM reviews rv
-      LEFT JOIN restaurants r ON r.id = rv.restaurant_id
-      LEFT JOIN users u ON u.username = rv.username
-      ORDER BY rv.created_at DESC
-    `);
-    const reviewSheet = addSheet("รีวิวร้าน", [
-      { header: "ร้าน", key: "restaurantName", width: 30 },
-      { header: "คะแนน", key: "rating", width: 9 },
-      { header: "ความเห็น", key: "comment", width: 60 },
-      { header: "ชื่อผู้รีวิว", key: "name", width: 24 },
-      { header: "Username", key: "username", width: 18 },
-      { header: "รีวิวเมื่อ", key: "createdAt", width: 20 }
-    ], reviews.map(rv => ({
-      restaurantName: rv.restaurant_name || "(ร้านถูกลบแล้ว)", rating: rv.rating,
-      comment: rv.comment || "", name: rv.user_name || rv.username, username: rv.username,
-      createdAt: rv.created_at
-    })));
-    reviewSheet.getColumn("comment").alignment = { wrapText: true, vertical: "top" };
-    reviewSheet.getColumn("createdAt").numFmt = DATETIME_FMT;
-
-    /* --- ประวัติกิจกรรม --- */
-    const activityCols = extraHeader => [
-      { header: "ร้าน", key: "name", width: 30 },
-      ...(extraHeader ? [{ header: extraHeader, key: "extra", width: 26 }] : []),
-      { header: "บัญชีผู้ใช้", key: "username", width: 18 },
-      { header: "เมื่อ", key: "time", width: 20 }
-    ];
-    const { rows: spins } = await pool.query("SELECT * FROM spin_history ORDER BY spun_at DESC");
-    addSheet("ประวัติการสุ่ม", activityCols(), spins.map(s => ({
-      name: s.restaurant_name, username: s.username || "(ไม่ได้ล็อกอิน)", time: s.spun_at
-    }))).getColumn("time").numFmt = DATETIME_FMT;
-
-    const { rows: visits } = await pool.query("SELECT * FROM visit_log ORDER BY visited_at DESC");
-    addSheet("ใช้บริการจริง", activityCols("การกระทำ"), visits.map(v => ({
-      name: v.restaurant_name, extra: v.action, username: v.username || "(ไม่ได้ล็อกอิน)", time: v.visited_at
-    }))).getColumn("time").numFmt = DATETIME_FMT;
-
-    const { rows: respins } = await pool.query("SELECT * FROM respin_log ORDER BY respun_at DESC");
-    addSheet("สุ่มใหม่ (ปฏิเสธผล)", activityCols(), respins.map(v => ({
-      name: v.restaurant_name, username: v.username || "(ไม่ได้ล็อกอิน)", time: v.respun_at
-    }))).getColumn("time").numFmt = DATETIME_FMT;
-
-    const { rows: searches } = await pool.query("SELECT * FROM search_log ORDER BY searched_at DESC");
-    addSheet("ประวัติการค้นหา", [
-      { header: "คำค้นหา", key: "term", width: 30 },
-      { header: "บัญชีผู้ใช้", key: "username", width: 18 },
-      { header: "ค้นหาเมื่อ", key: "time", width: 20 }
-    ], searches.map(s => ({
-      term: s.term, username: s.username || "(ไม่ได้ล็อกอิน)", time: s.searched_at
-    }))).getColumn("time").numFmt = DATETIME_FMT;
-
-    /* --- สรุปภาพรวม --- */
-    const { rows: funnelRows } = await pool.query(`
-      WITH activity_visitor_ids AS (
-        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL
-        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL
-        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL
-      ),
-      guest_activity_visitor_ids AS (
-        SELECT DISTINCT visitor_id FROM spin_history WHERE visitor_id IS NOT NULL AND username IS NULL
-        UNION SELECT DISTINCT visitor_id FROM visit_log WHERE visitor_id IS NOT NULL AND username IS NULL
-        UNION SELECT DISTINCT visitor_id FROM respin_log WHERE visitor_id IS NOT NULL AND username IS NULL
-      )
-      SELECT
-        (SELECT COUNT(*) FROM visitors) AS total_visitors,
-        (SELECT COUNT(*) FROM activity_visitor_ids) AS used_service_visitors,
-        (SELECT COUNT(*) FROM guest_activity_visitor_ids) AS guest_used_service_visitors
-    `);
-    const f = funnelRows[0];
-    const totalVisitors = parseInt(f.total_visitors, 10);
-    const usedService = parseInt(f.used_service_visitors, 10);
-    const { rows: favTotal } = await pool.query("SELECT COUNT(*) FROM favorites");
-    const summary = [
-      ["วันที่ออกรายงาน", new Date().toLocaleString("th-TH")],
-      ["", ""],
-      ["จำนวนร้านอาหารทั้งหมด", restaurants.length],
-      ["บัญชีลูกค้าที่สมัครแล้ว", users.length],
-      ["ยอดถูกใจรวม", parseInt(favTotal[0].count, 10)],
-      ["", ""],
-      ["เข้ามาเยี่ยมชมทั้งหมด (visitor)", totalVisitors],
-      ["เข้ามาแต่ไม่ได้ใช้บริการ", Math.max(0, totalVisitors - usedService)],
-      ["ใช้บริการแต่ไม่ได้ลงทะเบียน", parseInt(f.guest_used_service_visitors, 10)],
-      ["", ""],
-      ["จำนวนครั้งที่หมุนวงล้อ", spins.length],
-      ["ใช้บริการจริง (ครั้ง)", visits.length],
-      ["สุ่มใหม่ / ปฏิเสธผล (ครั้ง)", respins.length],
-      ["จำนวนครั้งที่ค้นหา", searches.length],
-      ["", ""],
-      ["รายการจองทั้งหมด", bookings.length],
-      ["รีวิวทั้งหมด", reviews.length],
-      ["ความคิดเห็นทั้งหมด", feedback.length],
-      ["  - 👍 สิ่งที่ชอบ", feedback.filter(x => x.type === "good").length],
-      ["  - 👎 สิ่งที่ไม่ชอบ", feedback.filter(x => x.type === "bad").length],
-      ["  - 💡 ควรปรับปรุง", feedback.filter(x => x.type === "improvement").length]
-    ];
-    fillSheet(summarySheet, [
-      { header: "รายการ", key: "label", width: 36 },
-      { header: "ค่า", key: "value", width: 24 }
-    ], summary.map(([label, value]) => ({ label, value })));
+      ds.rows.forEach(r => ws.addRow(r));
+      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: ds.columns.length } };
+      ds.columns.forEach(c => {
+        if (c.dt) ws.getColumn(c.key).numFmt = "yyyy-mm-dd hh:mm";
+        if (c.wrap) ws.getColumn(c.key).alignment = { wrapText: true, vertical: "top" };
+      });
+    });
 
     const stamp = new Date().toISOString().slice(0, 10);
-    const filename = "kin-arai-dee-export-" + stamp + ".xlsx";
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", 'attachment; filename="' + filename + '"');
+    res.setHeader("Content-Disposition", 'attachment; filename="kin-arai-dee-export-' + stamp + '.xlsx"');
     await wb.xlsx.write(res);
     res.end();
   } catch (e) {
@@ -983,6 +1054,51 @@ app.get("/api/export/excel", requireAdmin, async (req, res) => {
     // sending a JSON error at that point would throw ERR_HTTP_HEADERS_SENT.
     if (res.headersSent) return res.end();
     res.status(500).json({ error: "สร้างไฟล์ Excel ไม่สำเร็จ: " + e.message });
+  }
+});
+
+const pad2 = n => String(n).padStart(2, "0");
+function csvDateTime(d) {
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) +
+    " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+}
+function csvCell(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return String(v);
+  let s = (v instanceof Date) ? csvDateTime(v) : String(v);
+  // Spreadsheet formula injection: Excel/Sheets execute a cell starting with these, and
+  // this export carries user-submitted text (names, feedback, reviews). Neutralise it.
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  if (/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function toCsv(ds) {
+  const head = ds.columns.map(c => csvCell(c.header)).join(",");
+  const body = ds.rows.map(r => ds.columns.map(c => csvCell(r[c.key])).join(",")).join("\r\n");
+  return head + (body ? "\r\n" + body : "");
+}
+
+app.get("/api/export/csv", requireAdmin, async (req, res) => {
+  try {
+    const datasets = await buildExportDatasets();
+    const wanted = String(req.query.dataset || "");
+    const ds = datasets.find(x => x.key === wanted);
+    if (!ds) {
+      return res.status(400).json({
+        error: "ไม่พบชุดข้อมูลที่ต้องการ",
+        available: datasets.map(x => ({ key: x.key, name: x.name }))
+      });
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="kin-arai-dee-' + ds.key + '-' + stamp + '.csv"');
+    // Excel only reads a CSV as UTF-8 if it starts with a BOM — without it every Thai
+    // character opens as mojibake.
+    res.send("﻿" + toCsv(ds));
+  } catch (e) {
+    console.error(e);
+    if (res.headersSent) return res.end();
+    res.status(500).json({ error: "สร้างไฟล์ CSV ไม่สำเร็จ: " + e.message });
   }
 });
 
