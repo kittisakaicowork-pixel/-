@@ -444,6 +444,31 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
 .rank-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
 .rank-pct{font-size:10.5px;font-weight:700;color:var(--text-soft);text-align:right;margin-top:3px;}
 
+/* ============ ONBOARDING TOUR ============ */
+.tour-overlay{position:fixed;inset:0;z-index:400;}
+.tour-spotlight{
+  position:fixed;box-shadow:0 0 0 9999px rgba(15,12,10,.68);
+  transition:top .35s ease,left .35s ease,width .35s ease,height .35s ease,border-radius .35s ease;
+  pointer-events:none;
+}
+.tour-card{
+  position:fixed;background:var(--card-bg);border-radius:16px;padding:16px;
+  box-shadow:var(--shadow-lg);transition:top .35s ease,left .35s ease;
+  animation:fadeInUp .3s ease both;
+}
+.tour-dots{display:flex;gap:5px;margin-bottom:10px;}
+.tour-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:.25s;}
+.tour-dot.active{background:var(--primary);width:16px;border-radius:4px;}
+.tour-title{font-size:15px;font-weight:800;margin-bottom:4px;}
+.tour-desc{font-size:12.5px;color:var(--text-soft);line-height:1.55;margin-bottom:14px;}
+.tour-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.tour-skip{font-size:12px;color:var(--text-soft);font-weight:600;}
+.tour-skip:hover{color:var(--text);}
+.tour-btns{display:flex;gap:6px;}
+.tour-btn{padding:7px 15px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap;}
+.tour-btn.primary{background:var(--primary);color:#fff;}
+.tour-btn.ghost{background:var(--bg-alt);color:var(--text);}
+
 /* insights */
 .insight-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
 .insight-item:last-child{border-bottom:none;}
@@ -459,6 +484,7 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
   <div class="navbar-inner">
     <div class="logo">🍽️ กินอะไรดี?</div>
     <div class="nav-actions">
+      <button class="icon-btn" id="helpTourBtn" title="วิธีใช้งาน">❓</button>
       <button class="icon-btn" id="themeToggle" title="เลือกธีม">🌙</button>
       <div id="authArea"></div>
     </div>
@@ -1788,6 +1814,128 @@ $("#loginSubmitBtn").addEventListener("click",()=>{
 });
 $("#loginPassword").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#loginSubmitBtn").click(); });
 
+/* ================= ONBOARDING TOUR ================= */
+const TOUR_SEEN_KEY = "kinAraiDee_tourSeen";
+const TOUR_STEPS = [
+  { sel:"#navTabs", pad:6, radius:16,
+    title:"เมนูหลักของแอป",
+    desc:"สลับไปมาระหว่าง หมุนเลือกร้าน, ดูรายการร้านทั้งหมด, โปรไฟล์ของคุณ และรายการจอง ได้จากที่นี่" },
+  { sel:".filters", pad:4, radius:18,
+    title:"กรองร้านให้ตรงใจ",
+    desc:"เลือกประเภทอาหาร ช่วงราคา ชั้น และจำนวนคน วงล้อและรายการร้านจะกรองให้อัตโนมัติตามที่เลือก" },
+  { sel:".view-toggle-bar", pad:6, radius:16,
+    title:"สลับมุมมองได้ 2 แบบ",
+    desc:"ดูแบบ 🎡 วงล้อสุ่ม หรือสลับเป็น 🔲 กริดเพื่อดูรายชื่อร้านทั้งหมด พร้อมช่องค้นหาชื่อร้าน" },
+  { sel:"#spinBtn", pad:8, radius:999,
+    title:"ตัดสินใจไม่ได้? กดหมุนเลย!",
+    desc:"สุ่มร้านอาหารจากรายการที่กรองไว้ ให้วงล้อช่วยตัดสินใจแทนคุณได้เลย" },
+  { sel:"#themeToggle", pad:6, radius:999,
+    title:"ปรับธีมได้ตามใจ",
+    desc:"เลือกโหมดสว่าง มืด หรือให้ตามการตั้งค่าของอุปกรณ์แบบอัตโนมัติ" },
+  { sel:"#navTabs [data-tab='bookings']", pad:6, radius:999,
+    title:"ติดตามการจองของคุณ",
+    desc:"ดูประวัติการจองโต๊ะทั้งหมด พร้อมรหัสอ้างอิง ได้ในแท็บ 📅 การจอง" }
+];
+let tourIndex = 0;
+let tourEls = null;
+
+function tourMarkSeen(){
+  try{
+    const username = (state.currentUser && state.currentUser.username) || "guest";
+    const seen = JSON.parse(localStorage.getItem(TOUR_SEEN_KEY) || "[]");
+    if(!seen.includes(username)){ seen.push(username); localStorage.setItem(TOUR_SEEN_KEY, JSON.stringify(seen)); }
+  }catch(e){}
+}
+function tourHasSeen(username){
+  try{ return JSON.parse(localStorage.getItem(TOUR_SEEN_KEY) || "[]").includes(username || "guest"); }
+  catch(e){ return false; }
+}
+
+function startTour(){
+  if(tourEls || !$("#navTabs")) return;
+  switchMainTab("home");
+  tourIndex = 0;
+  const layer = document.createElement("div");
+  layer.className = "tour-overlay";
+  const spot = document.createElement("div");
+  spot.className = "tour-spotlight";
+  const card = document.createElement("div");
+  card.className = "tour-card";
+  layer.appendChild(spot); layer.appendChild(card);
+  document.body.appendChild(layer);
+  tourEls = { layer, spot, card };
+  window.addEventListener("resize", tourReposition);
+  renderTourStep();
+}
+function endTour(markSeen){
+  if(!tourEls) return;
+  window.removeEventListener("resize", tourReposition);
+  tourEls.layer.remove();
+  tourEls = null;
+  if(markSeen) tourMarkSeen();
+}
+function tourReposition(){
+  if(tourEls) placeTourStep(document.querySelector(TOUR_STEPS[tourIndex].sel), TOUR_STEPS[tourIndex]);
+}
+function tourScrollToTarget(target, cb){
+  const headerH = ($(".navbar") ? $(".navbar").offsetHeight : 100) + 16;
+  const rect = target.getBoundingClientRect();
+  const targetY = window.scrollY + rect.top - headerH;
+  window.scrollTo({ top: Math.max(0, targetY), behavior:"smooth" });
+  setTimeout(cb, 320);
+}
+function renderTourStep(){
+  if(!tourEls) return;
+  const step = TOUR_STEPS[tourIndex];
+  const target = document.querySelector(step.sel);
+  if(!target){ // element not on screen for this user/state — skip it
+    if(tourIndex < TOUR_STEPS.length-1){ tourIndex++; renderTourStep(); } else endTour(true);
+    return;
+  }
+  const dots = TOUR_STEPS.map((_,i)=>'<span class="tour-dot'+(i===tourIndex?" active":"")+'"></span>').join("");
+  tourEls.card.innerHTML =
+    '<div class="tour-dots">'+dots+'</div>'+
+    '<div class="tour-title">'+esc(step.title)+'</div>'+
+    '<div class="tour-desc">'+esc(step.desc)+'</div>'+
+    '<div class="tour-actions">'+
+      '<span class="tour-skip" id="tourSkipBtn">ข้ามทั้งหมด</span>'+
+      '<div class="tour-btns">'+
+        (tourIndex>0 ? '<button class="tour-btn ghost" id="tourPrevBtn">ย้อนกลับ</button>' : '')+
+        '<button class="tour-btn primary" id="tourNextBtn">'+(tourIndex===TOUR_STEPS.length-1?"เสร็จสิ้น 🎉":"ถัดไป")+'</button>'+
+      '</div>'+
+    '</div>';
+  $("#tourSkipBtn").addEventListener("click", ()=>endTour(true));
+  const prevBtn = $("#tourPrevBtn");
+  if(prevBtn) prevBtn.addEventListener("click", ()=>{ tourIndex--; renderTourStep(); });
+  $("#tourNextBtn").addEventListener("click", ()=>{
+    if(tourIndex===TOUR_STEPS.length-1){ endTour(true); showToast("🎉 พร้อมเริ่มใช้งานแล้ว!"); }
+    else { tourIndex++; renderTourStep(); }
+  });
+  tourScrollToTarget(target, ()=>placeTourStep(target, step));
+}
+function placeTourStep(target, step){
+  if(!target || !tourEls) return;
+  const r = target.getBoundingClientRect();
+  const pad = step.pad || 6;
+  Object.assign(tourEls.spot.style, {
+    left:(r.left-pad)+"px", top:(r.top-pad)+"px",
+    width:(r.width+pad*2)+"px", height:(r.height+pad*2)+"px",
+    borderRadius:(step.radius||14)+"px"
+  });
+  const card = tourEls.card;
+  const cw = Math.min(300, window.innerWidth - 24);
+  card.style.width = cw+"px";
+  let cardTop = r.top + r.height + pad + 14;
+  const estCardH = card.offsetHeight || 160;
+  if(cardTop + estCardH > window.innerHeight - 12){
+    cardTop = Math.max(12, r.top - pad - 14 - estCardH);
+  }
+  let cardLeft = Math.min(Math.max(r.left, 12), window.innerWidth - cw - 12);
+  card.style.top = cardTop+"px";
+  card.style.left = cardLeft+"px";
+}
+$("#helpTourBtn").addEventListener("click", ()=>startTour());
+
 /* ================= REGISTER ================= */
 function switchAuthTab(tab){
   state.authTab = tab;
@@ -1828,6 +1976,7 @@ async function registerUser(){
     showToast("🎉 สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");
     await login(username, password);
     switchAuthTab("login");
+    if(!tourHasSeen(username)) setTimeout(()=>startTour(), 500);
   }catch(err){
     $("#registerError").textContent = err.message;
     $("#registerError").style.display="block";
