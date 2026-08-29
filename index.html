@@ -855,13 +855,9 @@ body.dark .toast{background:#f1f1f6;color:#1a1a2e;}
         <input class="form-input" id="regEmail" type="email" placeholder="you@example.com">
       </div>
       <div class="form-group">
-        <label class="form-label">อายุ</label>
-        <input class="form-input" id="regAge" type="number" min="10" max="100" placeholder="อายุ (ปี)">
-      </div>
-      <div class="form-group">
         <label class="form-label">วันเดือนปีเกิด</label>
         <input class="form-input" id="regBirthdate" type="date">
-        <div class="hint-box" style="margin-top:6px;">ใช้สำหรับยืนยันตัวตนตอนรีเซ็ตรหัสผ่าน หากลืมรหัสผ่านในภายหลัง</div>
+        <div class="hint-box" style="margin-top:6px;">ใช้คำนวณอายุอัตโนมัติ และยืนยันตัวตนตอนรีเซ็ตรหัสผ่าน หากลืมรหัสผ่านในภายหลัง</div>
       </div>
       <div class="form-group">
         <label class="form-label">ชื่อผู้ใช้ (Username)</label>
@@ -1953,7 +1949,6 @@ async function registerUser(){
   const lastName = $("#regLastName").value.trim();
   const phone = $("#regPhone").value.trim();
   const email = $("#regEmail").value.trim();
-  const age = $("#regAge").value.trim();
   const birthdate = $("#regBirthdate").value;
   const username = $("#regUsername").value.trim();
   const password = $("#regPassword").value.trim();
@@ -1968,9 +1963,9 @@ async function registerUser(){
 
   try{
     await apiFetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({firstName,lastName,phone,email,age,birthdate,username,password,consentPdpa,consentMarketing})});
+      body:JSON.stringify({firstName,lastName,phone,email,birthdate,username,password,consentPdpa,consentMarketing})});
     $("#registerError").style.display="none";
-    ["regFirstName","regLastName","regPhone","regEmail","regAge","regBirthdate","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
+    ["regFirstName","regLastName","regPhone","regEmail","regBirthdate","regUsername","regPassword"].forEach(id=> $("#"+id).value="");
     $("#regConsentRequired").checked = false;
     $("#regConsentMarketing").checked = false;
     showToast("🎉 สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...");

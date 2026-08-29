@@ -258,17 +258,31 @@ async function seedUsers() {
   const adminHash = await bcrypt.hash("admin", 10);
   const userHash = await bcrypt.hash("user", 10);
   await pool.query(
-    `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age)
-     VALUES ('admin',$1,'admin','Admin',NULL,NULL,NULL,NULL,NULL)
+    `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email)
+     VALUES ('admin',$1,'admin','Admin',NULL,NULL,NULL,NULL)
      ON CONFLICT (username) DO NOTHING`,
     [adminHash]
   );
   await pool.query(
-    `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age)
-     VALUES ('user',$1,'user','คุณผู้ใช้','คุณ','ผู้ใช้','081-000-0000','user@example.com','25')
+    `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,birthdate)
+     VALUES ('user',$1,'user','คุณผู้ใช้','คุณ','ผู้ใช้','081-000-0000','user@example.com','2000-01-01')
      ON CONFLICT (username) DO NOTHING`,
     [userHash]
   );
+}
+
+// Age isn't stored — it drifts out of date the moment it's typed in. Derive it from
+// birthdate every time it's displayed instead.
+function calcAge(birthdate) {
+  if (!birthdate) return "";
+  const b = new Date(birthdate);
+  if (Number.isNaN(b.getTime())) return "";
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  const hadBirthdayThisYear = now.getMonth() > b.getMonth() ||
+    (now.getMonth() === b.getMonth() && now.getDate() >= b.getDate());
+  if (!hadBirthdayThisYear) age--;
+  return age;
 }
 
 function mapRestaurant(row) {
@@ -283,7 +297,7 @@ function mapUserPublic(row) {
   return {
     username: row.username, role: row.role, name: row.name,
     firstName: row.first_name || "", lastName: row.last_name || "",
-    phone: row.phone || "", email: row.email || "", age: row.age || "",
+    phone: row.phone || "", email: row.email || "", age: calcAge(row.birthdate),
     birthdate: row.birthdate || null,
     consentPdpaAt: row.consent_pdpa_at || null,
     consentMarketing: row.consent_marketing === true,
@@ -381,8 +395,8 @@ app.post("/api/admin/reseed", requireAdmin, async (req, res) => {
 /* ================= AUTH ================= */
 app.post("/api/register", async (req, res) => {
   try {
-    const { firstName, lastName, phone, email, age, birthdate, username, password, consentPdpa, consentMarketing } = req.body;
-    if (!firstName || !lastName || !phone || !email || !age || !birthdate || !username || !password) {
+    const { firstName, lastName, phone, email, birthdate, username, password, consentPdpa, consentMarketing } = req.body;
+    if (!firstName || !lastName || !phone || !email || !birthdate || !username || !password) {
       return res.status(400).json({ error: "กรุณากรอกข้อมูลให้ครบถ้วน" });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -398,9 +412,9 @@ app.post("/api/register", async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     const { rows } = await pool.query(
-      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,age,birthdate,consent_pdpa_at,consent_marketing)
-       VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8,$9,now(),$10) RETURNING *`,
-      [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, age, birthdate, consentMarketing === true]
+      `INSERT INTO users (username,password_hash,role,name,first_name,last_name,phone,email,birthdate,consent_pdpa_at,consent_marketing)
+       VALUES ($1,$2,'user',$3,$4,$5,$6,$7,$8,now(),$9) RETURNING *`,
+      [username, hash, firstName + " " + lastName, firstName, lastName, phone, email, birthdate, consentMarketing === true]
     );
     const token = issueToken(rows[0].username, rows[0].role);
     res.json(Object.assign(mapUserPublic(rows[0]), { token }));
@@ -931,7 +945,7 @@ async function buildExportDatasets() {
       ],
       rows: users.map(u => ({
         name: u.name, username: u.username, phone: u.phone || "", email: u.email || "",
-        age: u.age || "", birthdate: u.birthdate ? String(u.birthdate).slice(0, 10) : "",
+        age: calcAge(u.birthdate), birthdate: u.birthdate ? String(u.birthdate).slice(0, 10) : "",
         role: u.role === "admin" ? "ผู้ดูแลระบบ" : "สมาชิก",
         consentPdpaAt: u.consent_pdpa_at || null,
         consentMarketing: u.consent_marketing ? "ยินยอม" : "ไม่ยินยอม",
